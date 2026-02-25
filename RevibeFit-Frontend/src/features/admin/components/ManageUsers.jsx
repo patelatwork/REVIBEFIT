@@ -26,6 +26,11 @@ const ManageUsers = () => {
     fetchUsers();
   }, [filters]);
 
+  const getAdminHeaders = () => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
+  });
+
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -37,7 +42,7 @@ const ManageUsers = () => {
         ...(filters.userType && { userType: filters.userType })
       });
 
-      const response = await fetch(`${apiUrl}/api/admin/users?${queryParams}`);
+      const response = await fetch(`${apiUrl}/api/admin/users?${queryParams}`, { headers: getAdminHeaders() });
       const data = await response.json();
 
       if (data.success) {
@@ -101,9 +106,7 @@ const ManageUsers = () => {
       
       const response = await fetch(`${apiUrl}/api/admin/users/${user._id}/suspend`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           suspend: action === 'suspend',
           reason: suspensionReason
@@ -161,9 +164,7 @@ const ManageUsers = () => {
 
       const response = await fetch(`${apiUrl}/api/admin/lab-partners/${user._id}/commission-rate`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           commissionRate: rate
         })

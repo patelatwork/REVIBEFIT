@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { USER_TYPES } from "../constants.js";
+import config from "../config/index.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -237,9 +238,9 @@ userSchema.methods.generateAccessToken = function () {
       userType: this.userType,
       name: this.name,
     },
-    process.env.JWT_SECRET,
+    config.jwtSecret,
     {
-      expiresIn: process.env.JWT_EXPIRY || "7d",
+      expiresIn: config.jwtExpiry,
     }
   );
 };
@@ -250,9 +251,9 @@ userSchema.methods.generateRefreshToken = function () {
     {
       _id: this._id,
     },
-    process.env.JWT_SECRET,
+    config.jwtRefreshSecret,
     {
-      expiresIn: "30d",
+      expiresIn: config.jwtRefreshExpiry,
     }
   );
 };

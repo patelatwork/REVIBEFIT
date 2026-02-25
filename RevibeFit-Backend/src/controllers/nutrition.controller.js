@@ -1,12 +1,12 @@
 import { NutritionProfile } from "../models/nutritionProfile.model.js";
 import { MealPlan } from "../models/mealPlan.model.js";
+import { MealLog } from "../models/mealLog.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Initialize Gemini AI inside the function to ensure env vars are loaded
-// const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+import axios from "axios";
+import config from "../config/index.js";
 
 // ============ NUTRITION PROFILE ENDPOINTS ============
 
@@ -267,8 +267,8 @@ export const searchFood = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Search query is required");
   }
 
-  const clientId = process.env.FATSECRET_CLIENT_ID;
-  const clientSecret = process.env.FATSECRET_CLIENT_SECRET;
+  const clientId = config.fatSecret.clientId;
+  const clientSecret = config.fatSecret.clientSecret;
 
   if (!clientId || !clientSecret) {
     throw new ApiError(500, "FatSecret API credentials not configured");
@@ -308,6 +308,15 @@ export const searchFood = asyncHandler(async (req, res) => {
       }
     );
 
+    // FatSecret returns HTTP 200 even for API-level errors (e.g. IP not whitelisted)
+    if (searchResponse.data.error) {
+      const { code, message } = searchResponse.data.error;
+      if (code === 21) {
+        throw new ApiError(503, `FatSecret API rejected this server's IP address. Add your server IP to the allowed list in the FatSecret developer portal.`);
+      }
+      throw new ApiError(503, `FatSecret API error: ${message}`);
+    }
+
     const foodsData = searchResponse.data.foods?.food || [];
     const foods = Array.isArray(foodsData) ? foodsData : [foodsData];
 
@@ -338,8 +347,8 @@ export const analyzeFood = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Food ID is required");
   }
 
-  const clientId = process.env.FATSECRET_CLIENT_ID;
-  const clientSecret = process.env.FATSECRET_CLIENT_SECRET;
+  const clientId = config.fatSecret.clientId;
+  const clientSecret = config.fatSecret.clientSecret;
 
   if (!clientId || !clientSecret) {
     throw new ApiError(500, "FatSecret API credentials not configured");
@@ -378,6 +387,14 @@ export const analyzeFood = asyncHandler(async (req, res) => {
         },
       }
     );
+
+    if (foodResponse.data.error) {
+      const { code, message } = foodResponse.data.error;
+      if (code === 21) {
+        throw new ApiError(503, `FatSecret API rejected this server's IP address. Add your server IP to the allowed list in the FatSecret developer portal.`);
+      }
+      throw new ApiError(503, `FatSecret API error: ${message}`);
+    }
 
     const food = foodResponse.data.food;
     const servings = food.servings?.serving || [];
@@ -437,7 +454,7 @@ export const generateMealPlan = asyncHandler(async (req, res) => {
   }
 
   // Check if Gemini API key exists
-  if (!process.env.GEMINI_API_KEY) {
+  if (!config.geminiApiKey) {
     throw new ApiError(500, "Gemini API key not configured. Please add GEMINI_API_KEY to your .env file");
   }
 
@@ -504,13 +521,11 @@ Important: Return ONLY valid JSON, no additional text. Ensure meals meet the die
 
   try {
     // Call Gemini API for meal plan generation
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const genAI = new GoogleGenerativeAI(config.geminiApiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(aiPrompt);
     const response = await result.response;
     const text = response.text();
-
-    console.log("Response received:", text.substring(0, 200)); // Log first 200 chars
 
     // Parse response
     let mealPlanData;

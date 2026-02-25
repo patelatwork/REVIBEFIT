@@ -1,33 +1,32 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const nodemailer = require('nodemailer');
+import config from '../config/index.js';
 
 // Create email transporter
 const createTransporter = () => {
-  // Check if email configuration is available
-  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  if (!config.email.host || !config.email.user || !config.email.pass) {
     throw new Error('Email configuration missing. Please check your environment variables.');
   }
 
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: false, // true for 465, false for other ports
+    host: config.email.host,
+    port: config.email.port,
+    secure: false,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: config.email.user,
+      pass: config.email.pass,
     },
     tls: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: config.isProduction,
+    },
   });
 };
 
 // Send approval email to trainer or lab partner
 export const sendApprovalEmail = async (user) => {
   try {
-    // Check if we have necessary email configuration
-    if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
       console.log('Email configuration not found, skipping approval email');
       return { success: true, skipped: true, message: 'Email configuration not available' };
     }
@@ -37,7 +36,7 @@ export const sendApprovalEmail = async (user) => {
     const userTypeDisplay = user.userType === 'trainer' ? 'Trainer' : 'Lab Partner';
 
     const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'RevibeFit'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: `"${config.email.fromName}" <${config.email.from || config.email.user}>`,
       to: user.email,
       subject: `Welcome to RevibeFit - Your ${userTypeDisplay} Account Has Been Approved! 🎉`,
       html: `
@@ -150,8 +149,7 @@ export const sendApprovalEmail = async (user) => {
 // Send rejection email
 export const sendRejectionEmail = async (user, reason) => {
   try {
-    // Check if we have necessary email configuration
-    if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
       console.log('Email configuration not found, skipping rejection email');
       return { success: true, skipped: true, message: 'Email configuration not available' };
     }
@@ -161,7 +159,7 @@ export const sendRejectionEmail = async (user, reason) => {
     const userTypeDisplay = user.userType === 'trainer' ? 'Trainer' : 'Lab Partner';
 
     const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'RevibeFit'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: `"${config.email.fromName}" <${config.email.from || config.email.user}>`,
       to: user.email,
       subject: `RevibeFit - ${userTypeDisplay} Application Status`,
       html: `

@@ -7,22 +7,18 @@ import { LabBooking } from "../models/labBooking.model.js";
 import { PlatformInvoice } from "../models/platformInvoice.model.js";
 import { sendApprovalEmail, sendRejectionEmail } from "../utils/emailService.js";
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import config from "../config/index.js";
+import { escapeRegex } from "../middlewares/validate.middleware.js";
 
-// Admin credentials 
-const ADMIN_CREDENTIALS = {
-  email: "admin@gmail.com",
-  password: "Admin@123",
-  name: "RevibeFit Admin",
-  userType: USER_TYPES.ADMIN
-};
-
-// @desc    Admin Login
-// @route   POST /api/admin/login
-// @access  Public
+/**
+ * @desc    Admin Login
+ * @route   POST /api/admin/login
+ * @access  Public
+ */
 const adminLogin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Validate required fields
   if (!email || !password) {
     throw new ApiError(
       STATUS_CODES.BAD_REQUEST,
@@ -30,30 +26,41 @@ const adminLogin = asyncHandler(async (req, res) => {
     );
   }
 
-  // Check credentials
-  if (email !== ADMIN_CREDENTIALS.email || password !== ADMIN_CREDENTIALS.password) {
+  // Verify against environment-based admin credentials
+  if (email !== config.admin.email || password !== config.admin.password) {
     throw new ApiError(STATUS_CODES.UNAUTHORIZED, "Invalid admin credentials");
   }
 
-  // Create admin session data (without sensitive info)
+  // Generate JWT for admin session
   const adminData = {
-    email: ADMIN_CREDENTIALS.email,
-    name: ADMIN_CREDENTIALS.name,
-    userType: ADMIN_CREDENTIALS.userType,
-    isAdmin: true
+    email: config.admin.email,
+    name: config.admin.name,
+    userType: USER_TYPES.ADMIN,
+    isAdmin: true,
   };
 
-  // In a real app, you'd generate JWT tokens here
-  // For now, we'll just return the admin data
+  const accessToken = jwt.sign(
+    { email: adminData.email, userType: USER_TYPES.ADMIN, isAdmin: true },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiry }
+  );
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
 
   return res
     .status(STATUS_CODES.SUCCESS)
+    .cookie("accessToken", accessToken, cookieOptions)
     .json(
       new ApiResponse(
         STATUS_CODES.SUCCESS,
         {
           admin: adminData,
-          // You can add JWT tokens here later
+          accessToken,
         },
         "Admin logged in successfully"
       )
@@ -85,7 +92,7 @@ const getPendingApprovals = asyncHandler(async (req, res) => {
 // @access  Admin
 const approveUser = asyncHandler(async (req, res) => {
   const { userId } = req.params;
-  const adminEmail = ADMIN_CREDENTIALS.email; // In real app, get from authenticated admin
+  const adminEmail = req.adminUser?.email || config.admin.email;
 
   const user = await User.findById(userId);
 
@@ -297,9 +304,10 @@ const getAllUsers = asyncHandler(async (req, res) => {
   // Build filter query
   let filter = {};
   if (search) {
+    const safeSearch = escapeRegex(search);
     filter.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } }
+      { name: { $regex: safeSearch, $options: 'i' } },
+      { email: { $regex: safeSearch, $options: 'i' } }
     ];
   }
   if (userType) {
@@ -414,9 +422,6 @@ const generateMonthlyInvoice = asyncHandler(async (req, res) => {
   }).populate("fitnessEnthusiastId", "name email")
     .populate("selectedTests", "testName");
 
-  console.log(`Found ${unbilledBookings.length} unbilled bookings for lab partner ${labPartnerId}`);
-  console.log(`Date range: ${startDate} to ${endDate}`);
-
   if (unbilledBookings.length === 0) {
     // Check if there are ANY bookings for this lab partner
     const totalBookings = await LabBooking.countDocuments({ labPartnerId });
@@ -484,7 +489,7 @@ const generateMonthlyInvoice = asyncHandler(async (req, res) => {
     generatedDate: new Date(),
     bookingIds,
     commissionBreakdown,
-    generatedBy: req.user?.email || "admin@gmail.com",
+    generatedBy: req.adminUser?.email || config.admin.email,
   });
 
   // Update all bookings to mark them as billed
@@ -653,7 +658,7 @@ const generateAllMonthlyInvoices = asyncHandler(async (req, res) => {
         generatedDate: new Date(),
         bookingIds,
         commissionBreakdown,
-        generatedBy: req.user?.email || "admin@gmail.com",
+        generatedBy: req.adminUser?.email || config.admin.email,
       });
 
       // Update bookings
@@ -1353,7 +1358,7 @@ const generateFlexibleInvoice = asyncHandler(async (req, res) => {
     generatedDate: new Date(),
     bookingIds,
     commissionBreakdown,
-    generatedBy: req.user?.email || "admin@gmail.com",
+    generatedBy: req.adminUser?.email || config.admin.email,
   });
 
   // Update bookings to mark them as billed

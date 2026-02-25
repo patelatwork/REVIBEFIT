@@ -17,9 +17,14 @@ const PendingApprovals = () => {
     }
   }, [navigate]);
 
+  const getAdminHeaders = () => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
+  });
+
   const fetchPendingApprovals = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/pending-approvals');
+      const response = await fetch('http://localhost:8000/api/admin/pending-approvals', { headers: getAdminHeaders() });
       const data = await response.json();
       
       if (response.ok) {
@@ -40,9 +45,7 @@ const PendingApprovals = () => {
     try {
       const response = await fetch(`http://localhost:8000/api/admin/approve/${userId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({})
       });
       
@@ -70,9 +73,7 @@ const PendingApprovals = () => {
     try {
       const response = await fetch(`http://localhost:8000/api/admin/reject/${userId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           reason: 'Rejected by admin'
         })

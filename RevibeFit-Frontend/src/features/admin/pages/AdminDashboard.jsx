@@ -16,29 +16,43 @@ const AdminDashboard = () => {
     pendingApprovals: 0
   });
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
 
   useEffect(() => {
-    // Check if admin is logged in
     const admin = localStorage.getItem('admin');
-    if (!admin) {
+    const token = localStorage.getItem('adminToken');
+    // Old sessions won't have the token — clear and re-login
+    if (!admin || !token) {
+      localStorage.removeItem('admin');
+      localStorage.removeItem('adminToken');
       navigate('/admin/login');
     }
   }, [navigate]);
 
   const fetchStats = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/stats');
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('http://localhost:8000/api/admin/stats', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await response.json();
 
       if (response.ok) {
         setStats(data.data);
+        setFetchError('');
+      } else if (response.status === 401) {
+        localStorage.removeItem('admin');
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+      } else {
+        setFetchError(data.message || 'Failed to load stats');
       }
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      setFetchError('Could not reach server');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
   // Use live data hook for auto-refresh every 5 seconds (only for overview)
   useLiveData(() => {
@@ -49,6 +63,14 @@ const AdminDashboard = () => {
 
   const renderOverview = () => (
     <>
+      {/* Fetch Error Banner */}
+      {fetchError && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg">
+          <p className="text-red-800 font-medium">Error: {fetchError}</p>
+          <p className="text-red-600 text-sm mt-1">Try logging out and back in.</p>
+        </div>
+      )}
+
       {/* Pending Approvals Alert */}
       {!loading && stats.pendingApprovals > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">

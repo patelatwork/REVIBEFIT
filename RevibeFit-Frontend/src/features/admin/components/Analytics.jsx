@@ -32,13 +32,15 @@ const Analytics = () => {
     try {
       setLoading(true);
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const token = localStorage.getItem('adminToken');
+      const authHeaders = { Authorization: `Bearer ${token}` };
 
       // Fetch monthly growth data
-      const growthResponse = await fetch(`${apiUrl}/api/admin/analytics/monthly-growth`);
+      const growthResponse = await fetch(`${apiUrl}/api/admin/analytics/monthly-growth`, { headers: authHeaders });
       const growthData = await growthResponse.json();
 
       // Fetch user distribution data
-      const distributionResponse = await fetch(`${apiUrl}/api/admin/analytics/user-distribution`);
+      const distributionResponse = await fetch(`${apiUrl}/api/admin/analytics/user-distribution`, { headers: authHeaders });
       const distributionData = await distributionResponse.json();
 
       if (growthData.success) {

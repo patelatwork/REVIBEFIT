@@ -28,10 +28,11 @@ const LabEarningsAnalytics = () => {
         const fetchAnalytics = async () => {
             setLoading(true);
             try {
+                const authHeaders = { Authorization: `Bearer ${localStorage.getItem('adminToken')}` };
                 const [overTimeRes, breakdownRes, topPartnersRes] = await Promise.all([
-                    fetch(`http://localhost:8000/api/admin/analytics/lab-earnings/over-time?period=${timeFilter}`),
-                    fetch(`http://localhost:8000/api/admin/analytics/lab-earnings/breakdown?period=${timeFilter}`),
-                    fetch('http://localhost:8000/api/admin/analytics/lab-earnings/top-partners')
+                    fetch(`http://localhost:8000/api/admin/analytics/lab-earnings/over-time?period=${timeFilter}`, { headers: authHeaders }),
+                    fetch(`http://localhost:8000/api/admin/analytics/lab-earnings/breakdown?period=${timeFilter}`, { headers: authHeaders }),
+                    fetch('http://localhost:8000/api/admin/analytics/lab-earnings/top-partners', { headers: authHeaders })
                 ]);
 
                 const overTimeData = await overTimeRes.json();

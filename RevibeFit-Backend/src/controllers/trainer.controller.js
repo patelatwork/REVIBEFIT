@@ -304,10 +304,10 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Get trainer info
-  const trainer = await User.findById(trainerId).select("totalEarnings monthlyEarnings lastEarningsUpdate");
+  // Get trainer info including commission rate
+  const trainer = await User.findById(trainerId).select("totalEarnings monthlyEarnings lastEarningsUpdate commissionRate");
 
-  // Get monthly earnings breakdown
+  // Get monthly earnings breakdown with commission details
   const monthlyEarnings = await ClassBooking.aggregate([
     {
       $match: {
@@ -319,13 +319,34 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
     {
       $group: {
         _id: null,
-        total: { $sum: "$amountPaid" },
+        totalBookingValue: { $sum: "$amountPaid" },
+        totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        totalPayout: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
         count: { $sum: 1 },
       },
     },
   ]);
 
-  // Get earnings by date (last 30 days)
+  // Get all-time commission summary
+  const allTimeSummary = await ClassBooking.aggregate([
+    {
+      $match: {
+        trainerId: new mongoose.Types.ObjectId(trainerId),
+        bookingStatus: { $in: ["active", "completed"] },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalBookingValue: { $sum: "$amountPaid" },
+        totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        totalPayout: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Get earnings by date (last 30 days) with commission breakdown
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const earningsByDate = await ClassBooking.aggregate([
     {
@@ -340,7 +361,9 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
         _id: {
           $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
         },
-        dailyEarnings: { $sum: "$amountPaid" },
+        dailyEarnings: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
+        dailyBookingValue: { $sum: "$amountPaid" },
+        dailyCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
         bookings: { $sum: 1 },
       },
     },
@@ -349,7 +372,7 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
     },
   ]);
 
-  // Get earnings by class
+  // Get earnings by class with commission breakdown
   const earningsByClass = await ClassBooking.aggregate([
     {
       $match: {
@@ -360,7 +383,9 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
     {
       $group: {
         _id: "$classId",
-        totalEarnings: { $sum: "$amountPaid" },
+        totalEarnings: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
+        totalBookingValue: { $sum: "$amountPaid" },
+        totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
         bookings: { $sum: 1 },
       },
     },
@@ -380,6 +405,8 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
         classTitle: "$classInfo.title",
         classType: "$classInfo.classType",
         totalEarnings: 1,
+        totalBookingValue: 1,
+        totalCommission: 1,
         bookings: 1,
       },
     },
@@ -391,7 +418,7 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
     },
   ]);
 
-  // Get recent transactions
+  // Get recent transactions with commission data
   const recentTransactions = await ClassBooking.find({
     trainerId: trainerId,
     bookingStatus: { $in: ["active", "completed"] },
@@ -400,15 +427,27 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
     .populate("classId", "title classType")
     .sort({ createdAt: -1 })
     .limit(10)
-    .select("userId classId amountPaid createdAt bookingStatus");
+    .select("userId classId amountPaid commissionRate commissionAmount trainerPayout createdAt bookingStatus");
+
+  const monthlyData = monthlyEarnings.length > 0 ? monthlyEarnings[0] : {};
+  const allTimeData = allTimeSummary.length > 0 ? allTimeSummary[0] : {};
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
         totalEarnings: trainer.totalEarnings || 0,
-        monthlyEarnings: monthlyEarnings.length > 0 ? monthlyEarnings[0].total : 0,
-        monthlyBookings: monthlyEarnings.length > 0 ? monthlyEarnings[0].count : 0,
+        commissionRate: trainer.commissionRate || 15,
+        monthlyEarnings: monthlyData.totalPayout || 0,
+        monthlyBookingValue: monthlyData.totalBookingValue || 0,
+        monthlyCommission: monthlyData.totalCommission || 0,
+        monthlyBookings: monthlyData.count || 0,
+        allTime: {
+          totalBookingValue: allTimeData.totalBookingValue || 0,
+          totalCommission: allTimeData.totalCommission || 0,
+          totalPayout: allTimeData.totalPayout || 0,
+          totalBookings: allTimeData.count || 0,
+        },
         lastUpdate: trainer.lastEarningsUpdate,
         earningsByDate,
         earningsByClass,

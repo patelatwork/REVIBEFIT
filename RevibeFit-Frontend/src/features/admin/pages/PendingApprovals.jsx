@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../components/AdminNavbar';
+import AdminSidebar from '../components/AdminSidebar';
 import useLiveData from '../../../hooks/useLiveData';
 
 const PendingApprovals = () => {
@@ -17,9 +17,14 @@ const PendingApprovals = () => {
     }
   }, [navigate]);
 
+  const getAdminHeaders = () => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
+  });
+
   const fetchPendingApprovals = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/pending-approvals');
+      const response = await fetch('http://localhost:8000/api/admin/pending-approvals', { headers: getAdminHeaders() });
       const data = await response.json();
       
       if (response.ok) {
@@ -40,9 +45,7 @@ const PendingApprovals = () => {
     try {
       const response = await fetch(`http://localhost:8000/api/admin/approve/${userId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({})
       });
       
@@ -70,9 +73,7 @@ const PendingApprovals = () => {
     try {
       const response = await fetch(`http://localhost:8000/api/admin/reject/${userId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           reason: 'Rejected by admin'
         })
@@ -96,10 +97,11 @@ const PendingApprovals = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fffff0]">
-      <AdminNavbar />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <AdminSidebar activeSection="approvals" onSectionChange={() => {}} />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="lg:ml-64 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20 lg:pt-8">
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -253,6 +255,7 @@ const PendingApprovals = () => {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

@@ -1,103 +1,111 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Menu, X, LogOut } from 'lucide-react';
 import logo from '../../../assets/exercise_8407005.png';
 
+const links = [
+  { to: '/classes', label: 'Classes' },
+  { to: '/workouts', label: 'Workouts' },
+  { to: '/trainers', label: 'Trainers' },
+  { to: '/nutrition', label: 'Nutrition Plan' },
+  { to: '/care', label: 'Care' },
+  { to: '/blog', label: 'Blog' },
+];
+
 const FitnessEnthusiastNavbar = ({ userName }) => {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('accessToken');
     window.location.href = '/login';
   };
 
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+
   return (
-    <nav className="bg-[#fffff0] shadow-sm">
+    <nav className="sticky top-0 z-50 bg-[#fffff0]/90 backdrop-blur-md border-b border-gray-200/60 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
-          {/* Logo and Brand Name */}
-          <Link to="/fitness-enthusiast/dashboard" className="flex items-center space-x-3">
-            <img 
-              src={logo} 
-              alt="RevibeFit Logo" 
-              className="h-10 w-10"
-            />
-            <span className="text-2xl font-bold text-[#3f8554]">
-              RevibeFit
-            </span>
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <Link to="/fitness-enthusiast/dashboard" className="flex items-center gap-2.5">
+            <img src={logo} alt="RevibeFit Logo" className="h-9 w-9" />
+            <span className="text-xl font-bold text-[#3f8554] tracking-tight">RevibeFit</span>
           </Link>
 
-          {/* Desktop Navigation Links */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link 
-              to="/classes" 
-              className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
-            >
-              Classes
-            </Link>
-            <Link 
-              to="/workouts" 
-              className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
-            >
-              Workouts
-            </Link>
-            <Link 
-              to="/trainers" 
-              className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
-            >
-              Trainers
-            </Link>
-            <Link 
-              to="/nutrition" 
-              className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
-            >
-              Nutrition Plan
-            </Link>
-            <Link 
-              to="/care" 
-              className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
-            >
-              Care
-            </Link>
-            <Link 
-              to="/blog" 
-              className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
-            >
-              Blog
-            </Link>
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-1">
+            {links.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  isActive(l.to)
+                    ? 'bg-[#225533]/10 text-[#225533]'
+                    : 'text-gray-600 hover:text-[#225533] hover:bg-gray-100'
+                }`}
+              >
+                {l.label}
+              </Link>
+            ))}
           </div>
 
-          {/* Welcome Message and Logout */}
-          <div className="hidden md:flex items-center space-x-4">
-            <span className="text-gray-700 font-medium">
-              Welcome Back, <span className="text-[#3f8554] font-semibold">{userName}</span>
+          {/* Desktop Right */}
+          <div className="hidden md:flex items-center gap-3">
+            <span className="text-sm text-gray-600">
+              Welcome, <span className="font-semibold text-[#3f8554]">{userName}</span>
             </span>
             <button
               onClick={handleLogout}
-              className="px-6 py-2 bg-[#3f8554] text-white rounded hover:bg-[#225533] font-medium transition-colors duration-200"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#3f8554] hover:bg-[#225533] text-white text-sm font-medium rounded-lg transition-colors duration-200"
             >
-              Logout
+              <LogOut className="w-3.5 h-3.5" /> Logout
             </button>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Toggle */}
           <button
-            className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-[#3f8554] hover:text-[#225533] focus:outline-none"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="md:hidden p-2 rounded-lg text-[#3f8554] hover:bg-gray-100 transition-colors"
           >
-            <svg
-              className="h-6 w-6"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
+
+      {/* Mobile Menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-gray-200/60 bg-[#fffff0]/95 backdrop-blur-md">
+          <div className="px-4 py-3 space-y-1">
+            {links.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                onClick={() => setMobileOpen(false)}
+                className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(l.to)
+                    ? 'bg-[#225533]/10 text-[#225533]'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {l.label}
+              </Link>
+            ))}
+            <div className="pt-3 mt-2 border-t border-gray-200">
+              <p className="px-3 text-sm text-gray-500 mb-2">
+                Signed in as <span className="font-semibold text-[#3f8554]">{userName}</span>
+              </p>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#3f8554] hover:bg-[#225533] text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

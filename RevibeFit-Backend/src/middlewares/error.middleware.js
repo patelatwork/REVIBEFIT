@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { ApiError } from "../utils/ApiError.js";
 import { STATUS_CODES } from "../constants.js";
+import config from "../config/index.js";
 
 const errorHandler = (err, req, res, next) => {
   let error = err;
@@ -20,7 +21,7 @@ const errorHandler = (err, req, res, next) => {
     success: false,
     message: error.message,
     errors: error.errors,
-    ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
+    ...(!config.isProduction && { stack: error.stack }),
   };
 
   return res.status(error.statusCode).json(response);

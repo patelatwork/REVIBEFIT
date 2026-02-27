@@ -217,11 +217,7 @@ export const markBlogAsRead = asyncHandler(async (req, res) => {
  * @access  Private (Fitness Enthusiast)
  */
 export const getUserReadBlogs = asyncHandler(async (req, res) => {
-  console.log('getUserReadBlogs endpoint hit');
-  console.log('User from request:', req.user);
-  
   const userId = req.user._id;
-  console.log('Searching for blogs read by user:', userId);
 
   const readBlogs = await BlogReading.find({ user: userId })
     .populate({
@@ -233,12 +229,8 @@ export const getUserReadBlogs = asyncHandler(async (req, res) => {
     })
     .sort({ readAt: -1 });
 
-  console.log('Raw readBlogs found:', readBlogs.length);
-
   // Filter out any null blogs (in case blog was deleted)
   const validReadBlogs = readBlogs.filter(reading => reading.blogId);
-  
-  console.log('Valid readBlogs after filtering:', validReadBlogs.length);
 
   return res.status(200).json(
     new ApiResponse(200, validReadBlogs, "Read blogs retrieved successfully")

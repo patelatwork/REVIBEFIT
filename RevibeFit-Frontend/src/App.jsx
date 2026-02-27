@@ -36,6 +36,8 @@ import PendingApprovals from './features/admin/pages/PendingApprovals'
 import InvoiceManagement from './features/admin/pages/InvoiceManagement'
 import Classes from './features/fitness-enthusiast/pages/Classes'
 import LiveClasses from './features/fitness-enthusiast/pages/LiveClasses'
+import ClassVideoRoom from './features/fitness-enthusiast/pages/ClassVideoRoom'
+import TrainerVideoRoom from './features/trainer/pages/TrainerVideoRoom'
 import LabEarningsAnalytics from './features/admin/pages/LabEarningsAnalytics'
 
 function App() {
@@ -81,11 +83,13 @@ function App() {
         <Route path="/admin/pending-approvals" element={<PendingApprovals />} />
         <Route path="/admin/invoices" element={<InvoiceManagement />} />
         <Route path="/admin/analytics/lab-earnings" element={<LabEarningsAnalytics />} />
+        <Route path="/admin/earnings" element={<LabEarningsAnalytics />} />
 
         {/* Trainer Dashboard (custom navbar, no footer) */}
         <Route path="/trainer/dashboard" element={<TrainerDashboard />} />
         <Route path="/trainer/upload-blog" element={<UploadBlog />} />
         <Route path="/trainer/live-classes" element={<TrainerLiveClasses />} />
+        <Route path="/trainer/class-room/:classId" element={<TrainerVideoRoom />} />
         <Route path="/trainer/clients" element={<MyClients />} />
         <Route path="/trainer/schedule" element={<TrainerSchedule />} />
         <Route path="/trainer/earnings" element={<TrainerEarnings />} />
@@ -116,6 +120,9 @@ function App() {
             <Footer />
           </>
         } />
+
+        {/* WebRTC Video Room — Participant (full screen, no nav/footer) */}
+        <Route path="/class-room/:classId" element={<ClassVideoRoom />} />
 
         {/* Classes Page */}
         <Route path="/classes" element={

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const LiveClasses = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [upcomingClasses, setUpcomingClasses] = useState([]);
   const [completedClasses, setCompletedClasses] = useState([]);
@@ -110,10 +112,17 @@ const LiveClasses = () => {
   const handleJoinClass = (booking) => {
     const status = canJoinClass(booking);
     if (status.canJoin) {
-      // Open class link or redirect to class room
-      alert('Joining class... (Implement video conference integration here)');
+      // Navigate to WebRTC video room
+      navigate(`/class-room/${booking.classId._id}`);
     } else {
-      alert(status.message);
+      // If class is scheduled but not yet live, still allow navigating to waiting room
+      const classDateTime = getClassDateTime(booking.classId.scheduledDate, booking.classId.scheduledTime);
+      const now = new Date();
+      if (classDateTime && now < classDateTime) {
+        navigate(`/class-room/${booking.classId._id}`);
+      } else {
+        alert(status.message);
+      }
     }
   };
 
@@ -198,13 +207,12 @@ const LiveClasses = () => {
         <div className="mt-4 pt-4 border-t">
           <button
             onClick={() => handleJoinClass(booking)}
-            className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
-              canJoinClass(booking).canJoin
-                ? 'bg-[#3f8554] text-white hover:bg-[#225533] shadow-lg hover:shadow-xl'
-                : 'bg-gray-200 text-gray-600 cursor-not-allowed'
-            }`}
+            className="w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 bg-[#3f8554] text-white hover:bg-[#225533] shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           >
-            {canJoinClass(booking).message}
+            {canJoinClass(booking).canJoin && (
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+            )}
+            {canJoinClass(booking).canJoin ? 'Join Live Stream' : 'Enter Waiting Room'}
           </button>
         </div>
       )}

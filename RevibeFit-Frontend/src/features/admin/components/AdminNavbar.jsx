@@ -4,6 +4,7 @@ import logo from '../../../assets/exercise_8407005.png';
 const AdminNavbar = () => {
   const handleLogout = () => {
     localStorage.removeItem('admin');
+    localStorage.removeItem('adminToken');
     window.location.href = '/admin/login';
   };
 

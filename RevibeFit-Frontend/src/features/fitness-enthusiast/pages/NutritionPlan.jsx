@@ -17,6 +17,8 @@ import NutritionProfileForm from '../components/NutritionProfileForm';
 import MealPlanGenerator from '../components/MealPlanGenerator';
 import MealPlanDisplay from '../components/MealPlanDisplay';
 import SavedMealPlans from '../components/SavedMealPlans';
+import MealLogger from '../components/MealLogger';
+import DailyNutritionTracker from '../components/DailyNutritionTracker';
 
 const NutritionPlan = () => {
   const navigate = useNavigate();
@@ -26,6 +28,7 @@ const NutritionPlan = () => {
   const [selectedSavedPlan, setSelectedSavedPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [trackerRefresh, setTrackerRefresh] = useState(0);
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -50]);
 
@@ -337,6 +340,8 @@ const NutritionPlan = () => {
           {[
             { id: 'overview', label: 'Overview' },
             { id: 'profile', label: 'My Profile' },
+            { id: 'logMeal', label: 'Log Meal' },
+            { id: 'tracker', label: 'Daily Tracker' },
             { id: 'mealPlan', label: 'Generate Plan' },
             { id: 'savedPlans', label: 'My Plans' }
           ].map((tab) => (
@@ -442,6 +447,21 @@ const NutritionPlan = () => {
                 </button>
               </div>
             </div>
+          )}
+
+          {activeTab === 'logMeal' && (
+            <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+              <MealLogger
+                onMealLogged={() => setTrackerRefresh((p) => p + 1)}
+              />
+            </div>
+          )}
+
+          {activeTab === 'tracker' && (
+            <DailyNutritionTracker
+              nutritionProfile={nutritionProfile}
+              refreshKey={trackerRefresh}
+            />
           )}
 
           {activeTab === 'profile' && (

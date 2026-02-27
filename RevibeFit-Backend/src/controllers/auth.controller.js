@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import { STATUS_CODES, USER_TYPES } from "../constants.js";
+import config from "../config/index.js";
 
 // Generate access and refresh tokens
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -217,7 +218,7 @@ const login = asyncHandler(async (req, res) => {
   // Cookie options
   const options = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: config.isProduction,
     sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   };
@@ -257,7 +258,7 @@ const logout = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: config.isProduction,
     sameSite: "strict",
   };
 

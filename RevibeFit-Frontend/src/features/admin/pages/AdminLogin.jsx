@@ -62,8 +62,9 @@ const AdminLogin = () => {
           throw new Error(data.message || 'Login failed');
         }
 
-        // Store admin data in localStorage
+        // Store admin data and token in localStorage
         localStorage.setItem('admin', JSON.stringify(data.data.admin));
+        localStorage.setItem('adminToken', data.data.accessToken);
 
         // Navigate to admin dashboard
         navigate('/admin/dashboard');

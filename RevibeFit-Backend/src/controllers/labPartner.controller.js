@@ -9,6 +9,7 @@ import { PlatformInvoice } from "../models/platformInvoice.model.js";
 import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
+import { escapeRegex } from "../middlewares/validate.middleware.js";
 
 // @desc    Get all approved lab partners
 // @route   GET /api/lab-partners
@@ -26,10 +27,11 @@ const getApprovedLabPartners = asyncHandler(async (req, res) => {
 
   // Add search functionality
   if (search) {
+    const safeSearch = escapeRegex(search);
     query.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { laboratoryName: { $regex: search, $options: "i" } },
-      { laboratoryAddress: { $regex: search, $options: "i" } },
+      { name: { $regex: safeSearch, $options: "i" } },
+      { laboratoryName: { $regex: safeSearch, $options: "i" } },
+      { laboratoryAddress: { $regex: safeSearch, $options: "i" } },
     ];
   }
 

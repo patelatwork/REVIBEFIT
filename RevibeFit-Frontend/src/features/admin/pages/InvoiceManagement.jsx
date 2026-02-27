@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../components/AdminNavbar';
+import AdminSidebar from '../components/AdminSidebar';
 
 const InvoiceManagement = () => {
   const navigate = useNavigate();
@@ -40,10 +40,17 @@ const InvoiceManagement = () => {
     fetchGracePeriodStatus();
   }, [navigate]);
 
+  const getAdminHeaders = (extra = {}) => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
+    ...extra,
+  });
+
   const fetchInvoices = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices`
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices`,
+        { headers: getAdminHeaders() }
       );
 
       const data = await response.json();
@@ -64,7 +71,8 @@ const InvoiceManagement = () => {
   const fetchGracePeriodStatus = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices/grace-period-status`
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices/grace-period-status`,
+        { headers: getAdminHeaders() }
       );
 
       const data = await response.json();
@@ -80,7 +88,8 @@ const InvoiceManagement = () => {
     setLoadingLabPartners(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/lab-partners/commission-rates`
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/lab-partners/commission-rates`,
+        { headers: getAdminHeaders() }
       );
 
       const data = await response.json();
@@ -145,9 +154,7 @@ const InvoiceManagement = () => {
         `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices/generate-all`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAdminHeaders(),
           body: JSON.stringify({
             month: month,
             year: year,
@@ -261,9 +268,7 @@ const InvoiceManagement = () => {
         `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices/generate-flexible/${selectedLabPartner._id}`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAdminHeaders(),
           body: JSON.stringify(payload),
         }
       );
@@ -303,9 +308,7 @@ const InvoiceManagement = () => {
         `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices/enforce-overdue`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAdminHeaders(),
         }
       );
 
@@ -354,9 +357,7 @@ const InvoiceManagement = () => {
         `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices/${selectedInvoice._id}/mark-paid`,
         {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAdminHeaders(),
           body: JSON.stringify(paymentDetails),
         }
       );
@@ -419,10 +420,11 @@ const InvoiceManagement = () => {
   });
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fffff0' }}>
-      <AdminNavbar />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <AdminSidebar activeSection="invoices" onSectionChange={() => {}} />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="lg:ml-64 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20 lg:pt-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-4xl font-bold text-[#225533]">Invoice Management</h1>
@@ -1001,6 +1003,7 @@ const InvoiceManagement = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

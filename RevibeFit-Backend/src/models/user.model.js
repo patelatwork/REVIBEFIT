@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { USER_TYPES } from "../constants.js";
+import config from "../config/index.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -144,12 +145,14 @@ const userSchema = new mongoose.Schema(
     commissionRate: {
       type: Number,
       default: function () {
-        return this.userType === USER_TYPES.LAB_PARTNER ? 10 : undefined;
+        if (this.userType === USER_TYPES.LAB_PARTNER) return 10;
+        if (this.userType === USER_TYPES.TRAINER) return 15;
+        return undefined;
       },
       min: [0, "Commission rate cannot be negative"],
       max: [100, "Commission rate cannot exceed 100%"],
       required: function () {
-        return this.userType === USER_TYPES.LAB_PARTNER;
+        return this.userType === USER_TYPES.LAB_PARTNER || this.userType === USER_TYPES.TRAINER;
       },
     },
 
@@ -237,9 +240,9 @@ userSchema.methods.generateAccessToken = function () {
       userType: this.userType,
       name: this.name,
     },
-    process.env.JWT_SECRET,
+    config.jwtSecret,
     {
-      expiresIn: process.env.JWT_EXPIRY || "7d",
+      expiresIn: config.jwtExpiry,
     }
   );
 };
@@ -250,9 +253,9 @@ userSchema.methods.generateRefreshToken = function () {
     {
       _id: this._id,
     },
-    process.env.JWT_SECRET,
+    config.jwtRefreshSecret,
     {
-      expiresIn: "30d",
+      expiresIn: config.jwtRefreshExpiry,
     }
   );
 };

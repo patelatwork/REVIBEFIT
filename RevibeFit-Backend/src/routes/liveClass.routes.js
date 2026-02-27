@@ -10,6 +10,7 @@ import {
   cancelBooking,
   getLiveClassById,
   getTrainerEarnings,
+  getClassRoomInfo,
 } from "../controllers/liveClass.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
@@ -157,6 +158,26 @@ router.route("/trainer/earnings").get(getTrainerEarnings);
  *         description: Successfully joined class
  */
 router.route("/:id/join").post(joinLiveClass);
+
+/**
+ * @swagger
+ * /api/classes/{id}/room-info:
+ *   get:
+ *     summary: Get class room info for video room
+ *     tags: [Live Classes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Room info
+ */
+router.route("/:id/room-info").get(getClassRoomInfo);
 
 /**
  * @swagger

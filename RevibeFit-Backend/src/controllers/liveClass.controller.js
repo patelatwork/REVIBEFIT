@@ -657,3 +657,62 @@ export const getTrainerEarnings = asyncHandler(async (req, res) => {
     }, "Trainer earnings retrieved successfully")
   );
 });
+
+/**
+ * @desc    Get class info for the video room (authenticated)
+ * @route   GET /api/classes/:id/room-info
+ * @access  Private
+ */
+export const getClassRoomInfo = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const liveClass = await LiveClass.findById(id).populate(
+    "trainerId",
+    "name email specialization"
+  );
+
+  if (!liveClass || !liveClass.isActive) {
+    throw new ApiError(404, "Live class not found");
+  }
+
+  const isTrainer = liveClass.trainerId._id.toString() === req.user._id.toString();
+
+  // If not the trainer, verify booking
+  if (!isTrainer) {
+    const booking = await ClassBooking.findOne({
+      userId: req.user._id,
+      classId: id,
+      bookingStatus: "active",
+    });
+
+    if (!booking) {
+      throw new ApiError(403, "You must book this class to access the room");
+    }
+  }
+
+  const currentParticipants = await ClassBooking.countDocuments({
+    classId: id,
+    bookingStatus: "active",
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      classId: liveClass._id,
+      title: liveClass.title,
+      description: liveClass.description,
+      classType: liveClass.classType,
+      duration: liveClass.duration,
+      status: liveClass.status,
+      maxParticipants: liveClass.maxParticipants,
+      currentParticipants,
+      trainer: {
+        _id: liveClass.trainerId._id,
+        name: liveClass.trainerId.name,
+        specialization: liveClass.trainerId.specialization,
+      },
+      isTrainer,
+      scheduledDate: liveClass.scheduledDate,
+      scheduledTime: liveClass.scheduledTime,
+    }, "Room info retrieved successfully")
+  );
+});

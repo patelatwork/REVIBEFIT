@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Classes = () => {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('All');
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -389,9 +391,13 @@ const Classes = () => {
                   {/* Action Buttons */}
                   <div className="flex gap-4">
                     {isAlreadyBooked(selectedClass._id) ? (
-                      <div className="flex-1 bg-green-100 text-green-800 py-3 rounded-lg font-medium text-center">
-                        Already Enrolled
-                      </div>
+                      <button
+                        onClick={() => navigate(`/class-room/${selectedClass._id}`)}
+                        className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] duration-200 flex items-center justify-center gap-2"
+                      >
+                        <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                        Enter Class Room
+                      </button>
                     ) : (
                       <button
                         onClick={handleJoinClass}

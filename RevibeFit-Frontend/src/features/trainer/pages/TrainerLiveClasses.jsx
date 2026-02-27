@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import TrainerNavbar from '../components/TrainerNavbar';
 
 const TrainerLiveClasses = () => {
+  const navigate = useNavigate();
   const [trainerName, setTrainerName] = useState('Trainer');
   const [classes, setClasses] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -324,7 +326,16 @@ const TrainerLiveClasses = () => {
                       )}
                     </div>
 
-                    <div className="ml-6 flex gap-2">
+                    <div className="ml-6 flex flex-col gap-2">
+                      {(classItem.status === 'scheduled' || classItem.status === 'ongoing') && (
+                        <button
+                          onClick={() => navigate(`/trainer/class-room/${classItem._id}`)}
+                          className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                        >
+                          <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                          {classItem.status === 'ongoing' ? 'Rejoin Class' : 'Go Live'}
+                        </button>
+                      )}
                       {classItem.status === 'scheduled' && (
                         <>
                           <button

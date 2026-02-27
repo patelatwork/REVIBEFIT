@@ -1,7 +1,9 @@
 import dotenv from "dotenv";
+import { createServer } from "http";
 import connectDB from "./db/index.js";
 import { app } from "./app.js";
 import config, { validateConfig } from "./config/index.js";
+import { initSocketIO } from "./socket/index.js";
 
 // Load environment variables
 dotenv.config();
@@ -11,12 +13,20 @@ validateConfig();
 
 const PORT = config.port;
 
+// Create HTTP server and attach Socket.IO
+const httpServer = createServer(app);
+const io = initSocketIO(httpServer);
+
+// Make io accessible in routes if needed
+app.set("io", io);
+
 // Connect to MongoDB and start server
 connectDB()
   .then(() => {
-    const server = app.listen(PORT, () => {
+    const server = httpServer.listen(PORT, () => {
       console.log(`Server is running on port: ${PORT}`);
       console.log(`Environment: ${config.nodeEnv}`);
+      console.log(`WebRTC signaling server ready on ws://localhost:${PORT}`);
       console.log(`Server URL: http://localhost:${PORT}`);
     });
 

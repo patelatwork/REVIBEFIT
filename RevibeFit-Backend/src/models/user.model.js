@@ -145,12 +145,14 @@ const userSchema = new mongoose.Schema(
     commissionRate: {
       type: Number,
       default: function () {
-        return this.userType === USER_TYPES.LAB_PARTNER ? 10 : undefined;
+        if (this.userType === USER_TYPES.LAB_PARTNER) return 10;
+        if (this.userType === USER_TYPES.TRAINER) return 15;
+        return undefined;
       },
       min: [0, "Commission rate cannot be negative"],
       max: [100, "Commission rate cannot exceed 100%"],
       required: function () {
-        return this.userType === USER_TYPES.LAB_PARTNER;
+        return this.userType === USER_TYPES.LAB_PARTNER || this.userType === USER_TYPES.TRAINER;
       },
     },
 

@@ -81,6 +81,23 @@ const classBookingSchema = new mongoose.Schema(
     cancelledAt: {
       type: Date,
     },
+    // Commission tracking
+    commissionRate: {
+      type: Number,
+      default: 15,
+      min: [0, "Commission rate cannot be negative"],
+      max: [100, "Commission rate cannot exceed 100%"],
+    },
+    commissionAmount: {
+      type: Number,
+      default: 0,
+      min: [0, "Commission amount cannot be negative"],
+    },
+    trainerPayout: {
+      type: Number,
+      default: 0,
+      min: [0, "Trainer payout cannot be negative"],
+    },
     isActive: {
       type: Boolean,
       default: true,

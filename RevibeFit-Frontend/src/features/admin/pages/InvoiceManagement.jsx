@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../components/AdminNavbar';
+import AdminSidebar from '../components/AdminSidebar';
 
 const InvoiceManagement = () => {
   const navigate = useNavigate();
@@ -420,10 +420,11 @@ const InvoiceManagement = () => {
   });
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#fffff0' }}>
-      <AdminNavbar />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <AdminSidebar activeSection="invoices" onSectionChange={() => {}} />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="lg:ml-64 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20 lg:pt-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-4xl font-bold text-[#225533]">Invoice Management</h1>
@@ -1002,6 +1003,7 @@ const InvoiceManagement = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

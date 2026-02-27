@@ -383,7 +383,13 @@ export const joinLiveClass = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Create booking
+    // Get trainer's commission rate
+    const trainer = await User.findById(liveClass.trainerId._id).select("commissionRate");
+    const commissionRate = trainer?.commissionRate || 15;
+    const commissionAmount = (liveClass.cost * commissionRate) / 100;
+    const trainerPayout = liveClass.cost - commissionAmount;
+
+    // Create booking with commission tracking
     const booking = await ClassBooking.create({
       userId: req.user._id,
       classId: id,
@@ -391,6 +397,9 @@ export const joinLiveClass = asyncHandler(async (req, res) => {
       amountPaid: liveClass.cost,
       paymentStatus: "completed",
       bookingStatus: "active",
+      commissionRate: commissionRate,
+      commissionAmount: commissionAmount,
+      trainerPayout: trainerPayout,
     });
 
     // Update class participant count and earnings
@@ -401,13 +410,13 @@ export const joinLiveClass = asyncHandler(async (req, res) => {
       }
     );
 
-    // Update trainer earnings
+    // Update trainer earnings (only the payout portion goes to trainer)
     await User.findByIdAndUpdate(
       liveClass.trainerId._id,
       { 
         $inc: { 
-          totalEarnings: liveClass.cost,
-          monthlyEarnings: liveClass.cost 
+          totalEarnings: trainerPayout,
+          monthlyEarnings: trainerPayout 
         },
         lastEarningsUpdate: new Date()
       }

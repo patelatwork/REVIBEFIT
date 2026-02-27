@@ -25,6 +25,13 @@ import {
   getLabEarningsOverTime,
   getLabEarningsBreakdown,
   getTopLabPartners,
+  getDashboardAnalytics,
+  updateTrainerCommissionRate,
+  getTrainersWithCommissionRates,
+  getTrainerEarningsOverTime,
+  getTrainerEarningsBreakdown,
+  getPlatformRevenue,
+  getUserActivity,
 } from "../controllers/admin.controller.js";
 import { verifyAdmin } from "../middlewares/auth.middleware.js";
 import { authLimiter } from "../middlewares/rateLimiter.middleware.js";
@@ -147,6 +154,20 @@ router.post("/reject/:userId", rejectUser);
  */
 router.get("/stats", getUserStats);
 
+/**
+ * @swagger
+ * /api/admin/dashboard-analytics:
+ *   get:
+ *     summary: Get comprehensive dashboard analytics
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Complete dashboard analytics data
+ */
+router.get("/dashboard-analytics", getDashboardAnalytics);
+
 // ─── Analytics ────────────────────────────────────────────
 
 /**
@@ -218,6 +239,80 @@ router.get("/analytics/lab-earnings/breakdown", getLabEarningsBreakdown);
  *         description: Ranked list of top lab partners
  */
 router.get("/analytics/lab-earnings/top-partners", getTopLabPartners);
+
+// ─── Trainer commission management ────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/trainers/commission-rates:
+ *   get:
+ *     summary: Get all trainers with commission rates
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/trainers/commission-rates", getTrainersWithCommissionRates);
+
+/**
+ * @swagger
+ * /api/admin/trainers/{trainerId}/commission-rate:
+ *   patch:
+ *     summary: Update trainer commission rate
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch("/trainers/:trainerId/commission-rate", updateTrainerCommissionRate);
+
+// ─── Trainer earnings analytics ───────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/analytics/trainer-earnings/over-time:
+ *   get:
+ *     summary: Get trainer earnings over time
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/analytics/trainer-earnings/over-time", getTrainerEarningsOverTime);
+
+/**
+ * @swagger
+ * /api/admin/analytics/trainer-earnings/breakdown:
+ *   get:
+ *     summary: Get trainer earnings breakdown by trainer
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/analytics/trainer-earnings/breakdown", getTrainerEarningsBreakdown);
+
+// ─── Platform revenue ─────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/analytics/platform-revenue:
+ *   get:
+ *     summary: Get combined platform revenue from lab + trainer commissions
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/analytics/platform-revenue", getPlatformRevenue);
+
+// ─── User activity ────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}/activity:
+ *   get:
+ *     summary: Get detailed past activity for a specific user
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/users/:userId/activity", getUserActivity);
 
 // ─── User management ─────────────────────────────────────
 

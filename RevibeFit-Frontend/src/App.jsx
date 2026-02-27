@@ -83,6 +83,7 @@ function App() {
         <Route path="/admin/pending-approvals" element={<PendingApprovals />} />
         <Route path="/admin/invoices" element={<InvoiceManagement />} />
         <Route path="/admin/analytics/lab-earnings" element={<LabEarningsAnalytics />} />
+        <Route path="/admin/earnings" element={<LabEarningsAnalytics />} />
 
         {/* Trainer Dashboard (custom navbar, no footer) */}
         <Route path="/trainer/dashboard" element={<TrainerDashboard />} />

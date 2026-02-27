@@ -5,6 +5,14 @@ import { STATUS_CODES, USER_TYPES } from "../constants.js";
 import { User } from "../models/user.model.js";
 import { LabBooking } from "../models/labBooking.model.js";
 import { PlatformInvoice } from "../models/platformInvoice.model.js";
+import { LiveClass } from "../models/liveClass.model.js";
+import { ClassBooking } from "../models/classBooking.model.js";
+import CompletedWorkout from "../models/completedWorkout.model.js";
+import { MealLog } from "../models/mealLog.model.js";
+import { Blog } from "../models/blog.model.js";
+import { BlogReading } from "../models/blogReading.model.js";
+import { NutritionProfile } from "../models/nutritionProfile.model.js";
+import { LabTest } from "../models/labTest.model.js";
 import { sendApprovalEmail, sendRejectionEmail } from "../utils/emailService.js";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
@@ -1677,6 +1685,850 @@ const getTopLabPartners = asyncHandler(async (req, res) => {
   );
 });
 
+const getDashboardAnalytics = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const sixtyDaysAgo = new Date(now);
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+  // ── User Stats ─────────────────────────────────────
+  const [
+    totalUsers,
+    fitnessEnthusiasts,
+    trainers,
+    labPartners,
+    pendingApprovals,
+    activeUsers,
+    suspendedUsers,
+    newUsersThisMonth,
+    newUsersLastMonth,
+    newUsersThisWeek,
+  ] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ userType: USER_TYPES.FITNESS_ENTHUSIAST }),
+    User.countDocuments({ userType: USER_TYPES.TRAINER }),
+    User.countDocuments({ userType: USER_TYPES.LAB_PARTNER }),
+    User.countDocuments({ approvalStatus: "pending" }),
+    User.countDocuments({ isActive: true, isSuspended: false }),
+    User.countDocuments({ isSuspended: true }),
+    User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+    User.countDocuments({ createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }),
+    User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+  ]);
+
+  const userGrowthRate = newUsersLastMonth > 0
+    ? (((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100).toFixed(1)
+    : newUsersThisMonth > 0 ? 100 : 0;
+
+  // ── Workout Stats ──────────────────────────────────
+  const [
+    totalWorkoutsCompleted,
+    workoutsThisMonth,
+    workoutsThisWeek,
+    workoutsByDifficulty,
+    dailyWorkouts,
+  ] = await Promise.all([
+    CompletedWorkout.countDocuments(),
+    CompletedWorkout.countDocuments({ completedAt: { $gte: thirtyDaysAgo } }),
+    CompletedWorkout.countDocuments({ completedAt: { $gte: sevenDaysAgo } }),
+    CompletedWorkout.aggregate([
+      { $group: { _id: "$difficulty", count: { $sum: 1 } } }
+    ]),
+    CompletedWorkout.aggregate([
+      { $match: { completedAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$completedAt" } },
+          count: { $sum: 1 },
+          totalDuration: { $sum: "$duration" },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+  ]);
+
+  const avgWorkoutsPerDay = dailyWorkouts.length > 0
+    ? (dailyWorkouts.reduce((sum, d) => sum + d.count, 0) / dailyWorkouts.length).toFixed(1)
+    : 0;
+
+  // ── Live Class Stats ───────────────────────────────
+  const [
+    totalClasses,
+    scheduledClasses,
+    completedClasses,
+    ongoingClasses,
+    totalClassBookings,
+    classBookingsThisMonth,
+    classRevenueData,
+    classesByType,
+    classesByDifficulty,
+  ] = await Promise.all([
+    LiveClass.countDocuments(),
+    LiveClass.countDocuments({ status: "scheduled" }),
+    LiveClass.countDocuments({ status: "completed" }),
+    LiveClass.countDocuments({ status: "ongoing" }),
+    ClassBooking.countDocuments(),
+    ClassBooking.countDocuments({ bookingDate: { $gte: thirtyDaysAgo } }),
+    ClassBooking.aggregate([
+      { $match: { bookingStatus: { $in: ["active", "completed"] }, paymentStatus: "completed" } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$amountPaid" },
+          avgAmount: { $avg: "$amountPaid" },
+          totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+          totalTrainerPayout: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
+        },
+      },
+    ]),
+    LiveClass.aggregate([
+      { $group: { _id: "$classType", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+    LiveClass.aggregate([
+      { $group: { _id: "$difficultyLevel", count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const totalClassRevenue = classRevenueData[0]?.totalRevenue || 0;
+
+  // ── Monthly class revenue trend ────────────────────
+  const monthlyClassRevenue = await ClassBooking.aggregate([
+    { $match: { paymentStatus: "completed", createdAt: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) } } },
+    {
+      $group: {
+        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+        revenue: { $sum: "$amountPaid" },
+        bookings: { $sum: 1 },
+      },
+    },
+    { $sort: { "_id.year": 1, "_id.month": 1 } },
+  ]);
+
+  // ── Lab Booking Stats ──────────────────────────────
+  const [
+    totalLabBookings,
+    labBookingsThisMonth,
+    labBookingsByStatus,
+    totalLabRevenue,
+    totalCommissionEarned,
+    pendingCommission,
+    totalLabPlatformCommission,
+  ] = await Promise.all([
+    LabBooking.countDocuments(),
+    LabBooking.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+    LabBooking.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    LabBooking.aggregate([
+      { $match: { paymentReceivedByLab: true } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    LabBooking.aggregate([
+      { $match: { commissionStatus: "paid" } },
+      { $group: { _id: null, total: { $sum: "$commissionAmount" } } },
+    ]),
+    LabBooking.aggregate([
+      { $match: { commissionStatus: "pending" } },
+      { $group: { _id: null, total: { $sum: "$commissionAmount" } } },
+    ]),
+    // Total lab commission from all bookings where lab received payment (matches Earnings page)
+    LabBooking.aggregate([
+      { $match: { paymentReceivedByLab: true } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ["$commissionAmount", 0] } } } },
+    ]),
+  ]);
+
+  // ── Invoice Stats ──────────────────────────────────
+  const [
+    totalInvoices,
+    paidInvoices,
+    overdueInvoices,
+    pendingInvoices,
+    invoiceRevenue,
+  ] = await Promise.all([
+    PlatformInvoice.countDocuments(),
+    PlatformInvoice.countDocuments({ status: "paid" }),
+    PlatformInvoice.countDocuments({ status: "overdue" }),
+    PlatformInvoice.countDocuments({ status: "payment_due" }),
+    PlatformInvoice.aggregate([
+      { $match: { status: "paid" } },
+      { $group: { _id: null, total: { $sum: "$totalCommission" } } },
+    ]),
+  ]);
+
+  // ── Blog Stats ─────────────────────────────────────
+  const [
+    totalBlogs,
+    blogsThisMonth,
+    totalBlogReads,
+    blogReadsByCategory,
+    topBlogs,
+  ] = await Promise.all([
+    Blog.countDocuments({ isPublished: true }),
+    Blog.countDocuments({ isPublished: true, createdAt: { $gte: thirtyDaysAgo } }),
+    BlogReading.countDocuments(),
+    Blog.aggregate([
+      { $match: { isPublished: true } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+    BlogReading.aggregate([
+      { $group: { _id: "$blogId", reads: { $sum: 1 } } },
+      { $sort: { reads: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "blogs",
+          localField: "_id",
+          foreignField: "_id",
+          as: "blog",
+        },
+      },
+      { $unwind: "$blog" },
+      {
+        $project: {
+          title: "$blog.title",
+          category: "$blog.category",
+          author: "$blog.authorName",
+          reads: 1,
+        },
+      },
+    ]),
+  ]);
+
+  // ── Nutrition Stats ────────────────────────────────
+  const [
+    totalNutritionProfiles,
+    totalMealLogs,
+    mealLogsThisMonth,
+    goalDistribution,
+    dietDistribution,
+  ] = await Promise.all([
+    NutritionProfile.countDocuments(),
+    MealLog.countDocuments(),
+    MealLog.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+    NutritionProfile.aggregate([
+      { $group: { _id: "$fitnessGoal", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+    NutritionProfile.aggregate([
+      { $group: { _id: "$dietaryPreference", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+  ]);
+
+  // ── User Registration Trend (last 12 months) ──────
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(now.getMonth() - 11);
+  twelveMonthsAgo.setDate(1);
+  twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+  const registrationTrend = await User.aggregate([
+    { $match: { createdAt: { $gte: twelveMonthsAgo } } },
+    {
+      $group: {
+        _id: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" },
+        },
+        total: { $sum: 1 },
+        fitnessEnthusiasts: {
+          $sum: { $cond: [{ $eq: ["$userType", USER_TYPES.FITNESS_ENTHUSIAST] }, 1, 0] },
+        },
+        trainers: {
+          $sum: { $cond: [{ $eq: ["$userType", USER_TYPES.TRAINER] }, 1, 0] },
+        },
+        labPartners: {
+          $sum: { $cond: [{ $eq: ["$userType", USER_TYPES.LAB_PARTNER] }, 1, 0] },
+        },
+      },
+    },
+    { $sort: { "_id.year": 1, "_id.month": 1 } },
+  ]);
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const formattedRegistrationTrend = registrationTrend.map((item) => ({
+    month: `${monthNames[item._id.month - 1]} ${item._id.year}`,
+    total: item.total,
+    fitnessEnthusiasts: item.fitnessEnthusiasts,
+    trainers: item.trainers,
+    labPartners: item.labPartners,
+  }));
+
+  // ── Top Trainers by Bookings ───────────────────────
+  const topTrainers = await ClassBooking.aggregate([
+    { $match: { bookingStatus: { $in: ["active", "completed"] } } },
+    {
+      $group: {
+        _id: "$trainerId",
+        totalBookings: { $sum: 1 },
+        totalRevenue: { $sum: "$amountPaid" },
+      },
+    },
+    { $sort: { totalBookings: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: "users",
+        localField: "_id",
+        foreignField: "_id",
+        as: "trainer",
+      },
+    },
+    { $unwind: "$trainer" },
+    {
+      $project: {
+        name: "$trainer.name",
+        specialization: "$trainer.specialization",
+        totalBookings: 1,
+        totalRevenue: 1,
+      },
+    },
+  ]);
+
+  // ── Most Active Users (by workouts) ────────────────
+  const mostActiveUsers = await CompletedWorkout.aggregate([
+    {
+      $group: {
+        _id: "$userId",
+        workoutsCompleted: { $sum: 1 },
+        totalDuration: { $sum: "$duration" },
+      },
+    },
+    { $sort: { workoutsCompleted: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: "users",
+        localField: "_id",
+        foreignField: "_id",
+        as: "user",
+      },
+    },
+    { $unwind: "$user" },
+    {
+      $project: {
+        name: "$user.name",
+        email: "$user.email",
+        workoutsCompleted: 1,
+        totalDuration: 1,
+      },
+    },
+  ]);
+
+  // ── Recent Registrations ───────────────────────────
+  const recentRegistrations = await User.find()
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .select("name email userType createdAt isApproved isSuspended");
+
+  // ── Workout category distribution ──────────────────
+  const workoutCategories = await CompletedWorkout.aggregate([
+    { $group: { _id: "$category", count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+  ]);
+
+  // ── Format Monthly Class Revenue ───────────────────
+  const formattedMonthlyClassRevenue = monthlyClassRevenue.map((item) => ({
+    month: `${monthNames[item._id.month - 1]} ${item._id.year}`,
+    revenue: item.revenue,
+    bookings: item.bookings,
+  }));
+
+  // ── Activity Heatmap (workouts by day of week) ─────
+  const workoutsByDayOfWeek = await CompletedWorkout.aggregate([
+    { $match: { completedAt: { $gte: thirtyDaysAgo } } },
+    {
+      $group: {
+        _id: { $dayOfWeek: "$completedAt" },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const formattedHeatmap = workoutsByDayOfWeek.map((item) => ({
+    day: dayNames[item._id - 1],
+    workouts: item.count,
+  }));
+
+  // ── Platform Health Score ──────────────────────────
+  const retentionRate = totalUsers > 0 ? ((activeUsers / totalUsers) * 100).toFixed(1) : 0;
+  const engagementRate = fitnessEnthusiasts > 0
+    ? ((totalWorkoutsCompleted > 0 ? Math.min(fitnessEnthusiasts, totalWorkoutsCompleted) : 0) / fitnessEnthusiasts * 100).toFixed(1)
+    : 0;
+
+  const dashboard = {
+    overview: {
+      totalUsers,
+      activeUsers,
+      suspendedUsers,
+      pendingApprovals,
+      newUsersThisMonth,
+      newUsersThisWeek,
+      userGrowthRate: parseFloat(userGrowthRate),
+      retentionRate: parseFloat(retentionRate),
+    },
+    userBreakdown: {
+      fitnessEnthusiasts,
+      trainers,
+      labPartners,
+    },
+    workouts: {
+      totalCompleted: totalWorkoutsCompleted,
+      thisMonth: workoutsThisMonth,
+      thisWeek: workoutsThisWeek,
+      avgPerDay: parseFloat(avgWorkoutsPerDay),
+      byDifficulty: workoutsByDifficulty.map((d) => ({ name: d._id || "Unknown", value: d.count })),
+      byCategory: workoutCategories.map((c) => ({ name: c._id || "Unknown", value: c.count })),
+      dailyTrend: dailyWorkouts.map((d) => ({
+        date: d._id,
+        workouts: d.count,
+        totalDuration: d.totalDuration,
+      })),
+      activityHeatmap: formattedHeatmap,
+    },
+    liveClasses: {
+      total: totalClasses,
+      scheduled: scheduledClasses,
+      completed: completedClasses,
+      ongoing: ongoingClasses,
+      totalBookings: totalClassBookings,
+      bookingsThisMonth: classBookingsThisMonth,
+      totalRevenue: totalClassRevenue,
+      byType: classesByType.map((c) => ({ name: c._id, value: c.count })),
+      byDifficulty: classesByDifficulty.map((c) => ({ name: c._id || "beginner", value: c.count })),
+      monthlyRevenue: formattedMonthlyClassRevenue,
+    },
+    labs: {
+      totalBookings: totalLabBookings,
+      bookingsThisMonth: labBookingsThisMonth,
+      totalRevenue: totalLabRevenue[0]?.total || 0,
+      commissionEarned: totalCommissionEarned[0]?.total || 0,
+      pendingCommission: pendingCommission[0]?.total || 0,
+      bookingsByStatus: labBookingsByStatus.map((s) => ({ name: s._id, value: s.count })),
+    },
+    invoices: {
+      total: totalInvoices,
+      paid: paidInvoices,
+      overdue: overdueInvoices,
+      pending: pendingInvoices,
+      totalRevenue: invoiceRevenue[0]?.total || 0,
+    },
+    blogs: {
+      totalPublished: totalBlogs,
+      publishedThisMonth: blogsThisMonth,
+      totalReads: totalBlogReads,
+      byCategory: blogReadsByCategory.map((c) => ({ name: c._id, value: c.count })),
+      topBlogs,
+    },
+    nutrition: {
+      totalProfiles: totalNutritionProfiles,
+      totalMealLogs,
+      mealLogsThisMonth,
+      goalDistribution: goalDistribution.map((g) => ({ name: g._id, value: g.count })),
+      dietDistribution: dietDistribution.map((d) => ({ name: d._id, value: d.count })),
+    },
+    registrationTrend: formattedRegistrationTrend,
+    topTrainers,
+    mostActiveUsers,
+    recentRegistrations,
+    platformHealth: {
+      retentionRate: parseFloat(retentionRate),
+      engagementRate: parseFloat(engagementRate),
+      totalRevenue: totalClassRevenue + (totalLabRevenue[0]?.total || 0),
+      platformCommission: (classRevenueData[0]?.totalCommission || 0) + (totalLabPlatformCommission[0]?.total || 0),
+      trainerCommission: classRevenueData[0]?.totalCommission || 0,
+      labCommission: totalLabPlatformCommission[0]?.total || 0,
+      monthlyRevenue: totalClassRevenue,
+    },
+  };
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, dashboard, "Dashboard analytics fetched successfully")
+  );
+});
+
+// ─── Trainer Commission Management ────────────────────────
+
+// @desc    Update trainer commission rate
+// @route   PATCH /api/admin/trainers/:trainerId/commission-rate
+// @access  Private (Admin)
+const updateTrainerCommissionRate = asyncHandler(async (req, res) => {
+  const { trainerId } = req.params;
+  const { commissionRate } = req.body;
+
+  if (commissionRate === undefined || commissionRate === null) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Commission rate is required");
+  }
+  if (commissionRate < 0 || commissionRate > 100) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Commission rate must be between 0 and 100");
+  }
+
+  const trainer = await User.findOne({ _id: trainerId, userType: USER_TYPES.TRAINER });
+  if (!trainer) throw new ApiError(STATUS_CODES.NOT_FOUND, "Trainer not found");
+
+  const oldRate = trainer.commissionRate || 15;
+  trainer.commissionRate = commissionRate;
+  await trainer.save();
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      trainerId: trainer._id,
+      trainerName: trainer.name,
+      oldCommissionRate: oldRate,
+      newCommissionRate: commissionRate,
+    }, `Trainer commission rate updated from ${oldRate}% to ${commissionRate}%`)
+  );
+});
+
+// @desc    Get all trainers with their commission rates
+// @route   GET /api/admin/trainers/commission-rates
+// @access  Private (Admin)
+const getTrainersWithCommissionRates = asyncHandler(async (req, res) => {
+  const trainers = await User.find({ userType: USER_TYPES.TRAINER })
+    .select("name email specialization commissionRate totalEarnings monthlyEarnings isApproved isSuspended");
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, trainers, "Trainers with commission rates fetched")
+  );
+});
+
+// ─── Unified Earnings Analytics ───────────────────────────
+
+// @desc    Get trainer earnings analytics over time
+// @route   GET /api/admin/analytics/trainer-earnings/over-time
+// @access  Private (Admin)
+const getTrainerEarningsOverTime = asyncHandler(async (req, res) => {
+  const { period = "12months" } = req.query;
+  let dateFilter = {};
+  const now = new Date();
+
+  if (period === "30days") {
+    dateFilter = { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+  } else if (period === "12months") {
+    dateFilter = { $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1) };
+  }
+
+  const matchStage = { bookingStatus: { $in: ["active", "completed"] }, paymentStatus: "completed" };
+  if (dateFilter.$gte) matchStage.createdAt = dateFilter;
+
+  const fmt = period === "30days" ? "%Y-%m-%d" : "%Y-%m";
+  const data = await ClassBooking.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: { $dateToString: { format: fmt, date: "$createdAt" } },
+        totalBookingValue: { $sum: "$amountPaid" },
+        platformCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        trainerPayout: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
+        bookings: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+    {
+      $project: {
+        _id: 0,
+        date: "$_id",
+        totalBookingValue: 1,
+        platformCommission: 1,
+        trainerPayout: 1,
+        bookings: 1,
+      },
+    },
+  ]);
+
+  return res.status(STATUS_CODES.SUCCESS).json(new ApiResponse(STATUS_CODES.SUCCESS, data, "Trainer earnings over time"));
+});
+
+// @desc    Get trainer earnings breakdown by trainer
+// @route   GET /api/admin/analytics/trainer-earnings/breakdown
+// @access  Private (Admin)
+const getTrainerEarningsBreakdown = asyncHandler(async (req, res) => {
+  const trainers = await ClassBooking.aggregate([
+    { $match: { bookingStatus: { $in: ["active", "completed"] }, paymentStatus: "completed" } },
+    {
+      $group: {
+        _id: "$trainerId",
+        totalBookingValue: { $sum: "$amountPaid" },
+        platformCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        trainerPayout: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
+        totalBookings: { $sum: 1 },
+        avgCommissionRate: { $avg: { $ifNull: ["$commissionRate", 15] } },
+      },
+    },
+    { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "trainer" } },
+    { $unwind: "$trainer" },
+    {
+      $project: {
+        _id: 1,
+        name: "$trainer.name",
+        email: "$trainer.email",
+        specialization: "$trainer.specialization",
+        commissionRate: "$trainer.commissionRate",
+        totalBookingValue: 1,
+        platformCommission: 1,
+        trainerPayout: 1,
+        totalBookings: 1,
+        avgCommissionRate: 1,
+      },
+    },
+    { $sort: { totalBookingValue: -1 } },
+  ]);
+
+  return res.status(STATUS_CODES.SUCCESS).json(new ApiResponse(STATUS_CODES.SUCCESS, trainers, "Trainer earnings breakdown"));
+});
+
+// @desc    Get combined platform revenue (lab + trainer commissions)
+// @route   GET /api/admin/analytics/platform-revenue
+// @access  Private (Admin)
+const getPlatformRevenue = asyncHandler(async (req, res) => {
+  const { period = '12months' } = req.query;
+
+  // Build date filter based on period
+  let dateFilter = {};
+  const now = new Date();
+  if (period === '30days') {
+    dateFilter = { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+  } else if (period === '12months') {
+    dateFilter = { $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1) };
+  }
+  // period === 'all' → no date filter
+
+  const classMatch = { bookingStatus: { $in: ["active", "completed"] }, paymentStatus: "completed" };
+  if (dateFilter.$gte) classMatch.createdAt = dateFilter;
+
+  const labMatch = { paymentReceivedByLab: true };
+  if (dateFilter.$gte) labMatch.paymentReceivedDate = dateFilter;
+
+  // Trainer commission revenue
+  const trainerCommission = await ClassBooking.aggregate([
+    { $match: classMatch },
+    {
+      $group: {
+        _id: null,
+        totalClassBookingValue: { $sum: "$amountPaid" },
+        totalTrainerCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        totalTrainerPayout: { $sum: { $ifNull: ["$trainerPayout", "$amountPaid"] } },
+        bookings: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Lab commission revenue
+  const labCommission = await LabBooking.aggregate([
+    { $match: labMatch },
+    {
+      $group: {
+        _id: null,
+        totalLabBookingValue: { $sum: "$totalAmount" },
+        totalLabCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        bookings: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Monthly breakdown
+  let monthStart;
+  let dateFmt = "%Y-%m";
+  if (period === '30days') {
+    monthStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    dateFmt = "%Y-%m-%d";
+  } else if (period === '12months') {
+    monthStart = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+  } else {
+    monthStart = new Date(0);
+  }
+
+  const monthlyTrainer = await ClassBooking.aggregate([
+    { $match: { bookingStatus: { $in: ["active", "completed"] }, paymentStatus: "completed", createdAt: { $gte: monthStart } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: dateFmt, date: "$createdAt" } },
+        trainerCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        classRevenue: { $sum: "$amountPaid" },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const monthlyLab = await LabBooking.aggregate([
+    { $match: { paymentReceivedByLab: true, paymentReceivedDate: { $gte: monthStart } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: dateFmt, date: "$paymentReceivedDate" } },
+        labCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+        labRevenue: { $sum: "$totalAmount" },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // Merge monthly data
+  const monthlyMap = {};
+  monthlyTrainer.forEach((m) => {
+    monthlyMap[m._id] = { month: m._id, trainerCommission: m.trainerCommission, classRevenue: m.classRevenue, labCommission: 0, labRevenue: 0 };
+  });
+  monthlyLab.forEach((m) => {
+    if (!monthlyMap[m._id]) monthlyMap[m._id] = { month: m._id, trainerCommission: 0, classRevenue: 0, labCommission: 0, labRevenue: 0 };
+    monthlyMap[m._id].labCommission = m.labCommission;
+    monthlyMap[m._id].labRevenue = m.labRevenue;
+  });
+  const monthlyRevenue = Object.values(monthlyMap).sort((a, b) => a.month.localeCompare(b.month));
+  monthlyRevenue.forEach((m) => { m.totalPlatformRevenue = m.trainerCommission + m.labCommission; });
+
+  const tc = trainerCommission[0] || { totalClassBookingValue: 0, totalTrainerCommission: 0, totalTrainerPayout: 0, bookings: 0 };
+  const lc = labCommission[0] || { totalLabBookingValue: 0, totalLabCommission: 0, bookings: 0 };
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      summary: {
+        totalPlatformRevenue: tc.totalTrainerCommission + lc.totalLabCommission,
+        trainerCommissionTotal: tc.totalTrainerCommission,
+        labCommissionTotal: lc.totalLabCommission,
+        totalClassBookingValue: tc.totalClassBookingValue,
+        totalLabBookingValue: lc.totalLabBookingValue,
+        totalTrainerPayout: tc.totalTrainerPayout,
+        totalClassBookings: tc.bookings,
+        totalLabBookings: lc.bookings,
+      },
+      monthlyRevenue,
+    }, "Platform revenue fetched successfully")
+  );
+});
+
+// ─── User Activity ────────────────────────────────────────
+
+// @desc    Get detailed activity for a specific user
+// @route   GET /api/admin/users/:userId/activity
+// @access  Private (Admin)
+const getUserActivity = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await User.findById(userId).select("-password -refreshToken");
+  if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found");
+
+  const activity = { user };
+
+  if (user.userType === USER_TYPES.FITNESS_ENTHUSIAST) {
+    // Workouts completed
+    const workouts = await CompletedWorkout.find({ userId }).sort({ completedAt: -1 }).limit(50);
+    // Class bookings
+    const classBookings = await ClassBooking.find({ userId })
+      .populate("classId", "title classType scheduledDate cost")
+      .populate("trainerId", "name")
+      .sort({ createdAt: -1 }).limit(50);
+    // Lab bookings
+    const labBookings = await LabBooking.find({ userId })
+      .populate("labPartnerId", "name laboratoryName")
+      .sort({ createdAt: -1 }).limit(50);
+    // Meal logs
+    const mealLogs = await MealLog.find({ userId }).sort({ date: -1 }).limit(30);
+    // Blog readings
+    const blogReadings = await BlogReading.find({ userId })
+      .populate("blogId", "title category")
+      .sort({ readAt: -1 }).limit(30);
+    // Nutrition profile
+    const nutritionProfile = await NutritionProfile.findOne({ userId });
+
+    // Summary stats
+    const totalSpent = classBookings.reduce((s, b) => s + (b.amountPaid || 0), 0)
+      + labBookings.reduce((s, b) => s + (b.totalAmount || 0), 0);
+
+    activity.workouts = workouts;
+    activity.classBookings = classBookings;
+    activity.labBookings = labBookings;
+    activity.mealLogs = mealLogs;
+    activity.blogReadings = blogReadings;
+    activity.nutritionProfile = nutritionProfile;
+    activity.summary = {
+      totalWorkouts: workouts.length,
+      totalClassBookings: classBookings.length,
+      totalLabBookings: labBookings.length,
+      totalMealLogs: mealLogs.length,
+      totalBlogReads: blogReadings.length,
+      totalSpent,
+    };
+  } else if (user.userType === USER_TYPES.TRAINER) {
+    // Classes created
+    const classes = await LiveClass.find({ trainerId: userId }).sort({ createdAt: -1 }).limit(50);
+    // Bookings received
+    const bookingsReceived = await ClassBooking.find({ trainerId: userId })
+      .populate("userId", "name email")
+      .populate("classId", "title classType")
+      .sort({ createdAt: -1 }).limit(50);
+    // Blogs written
+    const blogs = await Blog.find({ author: userId }).sort({ createdAt: -1 }).limit(30);
+    // Earnings
+    const earningsAgg = await ClassBooking.aggregate([
+      { $match: { trainerId: new mongoose.Types.ObjectId(userId), bookingStatus: { $in: ["active", "completed"] } } },
+      {
+        $group: {
+          _id: null,
+          totalBookingValue: { $sum: "$amountPaid" },
+          totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+          totalPayout: { $sum: { $ifNull: ["$trainerPayout", 0] } },
+          bookings: { $sum: 1 },
+        },
+      },
+    ]);
+
+    activity.classes = classes;
+    activity.bookingsReceived = bookingsReceived;
+    activity.blogs = blogs;
+    activity.earnings = earningsAgg[0] || { totalBookingValue: 0, totalCommission: 0, totalPayout: 0, bookings: 0 };
+    activity.summary = {
+      totalClasses: classes.length,
+      totalBookingsReceived: bookingsReceived.length,
+      totalBlogs: blogs.length,
+      totalEarnings: user.totalEarnings || 0,
+      commissionRate: user.commissionRate || 15,
+    };
+  } else if (user.userType === USER_TYPES.LAB_PARTNER) {
+    // Lab bookings
+    const labBookings = await LabBooking.find({ labPartnerId: userId })
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 }).limit(50);
+    // Invoices
+    const invoices = await PlatformInvoice.find({ labPartnerId: userId }).sort({ createdAt: -1 }).limit(20);
+    // Tests offered
+    const tests = await LabTest.find({ _id: { $in: user.offeredTests || [] } });
+    // Earnings
+    const earningsAgg = await LabBooking.aggregate([
+      { $match: { labPartnerId: new mongoose.Types.ObjectId(userId), paymentStatus: "completed" } },
+      {
+        $group: {
+          _id: null,
+          totalBookingValue: { $sum: "$totalAmount" },
+          totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } },
+          bookings: { $sum: 1 },
+        },
+      },
+    ]);
+
+    activity.labBookings = labBookings;
+    activity.invoices = invoices;
+    activity.tests = tests;
+    activity.earnings = earningsAgg[0] || { totalBookingValue: 0, totalCommission: 0, bookings: 0 };
+    activity.summary = {
+      totalBookings: labBookings.length,
+      totalInvoices: invoices.length,
+      totalTests: tests.length,
+      totalEarnings: user.totalEarnings || 0,
+      commissionRate: user.commissionRate || 10,
+    };
+  }
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, activity, "User activity fetched successfully")
+  );
+});
+
 export {
   adminLogin,
   getPendingApprovals,
@@ -1702,5 +2554,12 @@ export {
   getInvoiceRequests,
   getLabEarningsOverTime,
   getLabEarningsBreakdown,
-  getTopLabPartners
+  getTopLabPartners,
+  getDashboardAnalytics,
+  updateTrainerCommissionRate,
+  getTrainersWithCommissionRates,
+  getTrainerEarningsOverTime,
+  getTrainerEarningsBreakdown,
+  getPlatformRevenue,
+  getUserActivity,
 };

@@ -30,7 +30,7 @@ import ManageBookings from './features/lab-partner/pages/ManageBookings'
 import MyInvoices from './features/lab-partner/pages/MyInvoices'
 import LabReports from './features/lab-partner/pages/LabReports'
 import LabProfile from './features/lab-partner/pages/LabProfile'
-import AdminLogin from './features/admin/pages/AdminLogin'
+
 import AdminDashboard from './features/admin/pages/AdminDashboard'
 import PendingApprovals from './features/admin/pages/PendingApprovals'
 import InvoiceManagement from './features/admin/pages/InvoiceManagement'
@@ -39,6 +39,11 @@ import LiveClasses from './features/fitness-enthusiast/pages/LiveClasses'
 import ClassVideoRoom from './features/fitness-enthusiast/pages/ClassVideoRoom'
 import TrainerVideoRoom from './features/trainer/pages/TrainerVideoRoom'
 import LabEarningsAnalytics from './features/admin/pages/LabEarningsAnalytics'
+
+import ManagerDashboard from './features/manager/pages/ManagerDashboard'
+import ManagerPendingApprovals from './features/manager/pages/ManagerPendingApprovals'
+import ManagerUsers from './features/manager/pages/ManagerUsers'
+import AdminManagers from './features/admin/pages/AdminManagers'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -78,12 +83,19 @@ function App() {
         <Route path="/signup" element={<Signup />} />
 
         {/* Admin Routes (no navbar/footer) */}
-        <Route path="/admin/login" element={<AdminLogin />} />
+
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/pending-approvals" element={<PendingApprovals />} />
         <Route path="/admin/invoices" element={<InvoiceManagement />} />
         <Route path="/admin/analytics/lab-earnings" element={<LabEarningsAnalytics />} />
         <Route path="/admin/earnings" element={<LabEarningsAnalytics />} />
+        <Route path="/admin/managers" element={<AdminManagers />} />
+
+        {/* Manager Routes (no navbar/footer) */}
+
+        <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+        <Route path="/manager/pending-approvals" element={<ManagerPendingApprovals />} />
+        <Route path="/manager/users" element={<ManagerUsers />} />
 
         {/* Trainer Dashboard (custom navbar, no footer) */}
         <Route path="/trainer/dashboard" element={<TrainerDashboard />} />

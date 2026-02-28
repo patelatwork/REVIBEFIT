@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { USER_TYPES } from "../constants.js";
+import { USER_TYPES, INDIAN_STATES } from "../constants.js";
 import config from "../config/index.js";
 
 const userSchema = new mongoose.Schema(
@@ -34,7 +34,12 @@ const userSchema = new mongoose.Schema(
     },
     age: {
       type: Number,
-      required: [true, "Age is required"],
+      required: [
+        function () {
+          return this.userType !== USER_TYPES.MANAGER;
+        },
+        "Age is required",
+      ],
       min: [13, "Age must be at least 13"],
       max: [100, "Age must be less than 100"],
     },
@@ -42,6 +47,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "User type is required"],
       enum: Object.values(USER_TYPES),
+    },
+
+    // Location fields (all users)
+    city: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    state: {
+      type: String,
+      enum: [...INDIAN_STATES, null],
+      trim: true,
+      default: null,
     },
 
     // Fitness Enthusiast specific fields
@@ -156,6 +174,26 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    // Manager specific fields
+    assignedRegion: {
+      type: String,
+      enum: [...INDIAN_STATES, null],
+      default: null,
+    },
+    department: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    profilePhoto: {
+      type: String,
+      default: null,
+    },
+    createdByAdmin: {
+      type: String,
+      default: null,
+    },
+
     // Common fields
     isVerified: {
       type: Boolean,
@@ -180,16 +218,31 @@ const userSchema = new mongoose.Schema(
     isApproved: {
       type: Boolean,
       default: function () {
-        // Fitness enthusiasts are auto-approved, trainers and lab partners need approval
-        return this.userType === USER_TYPES.FITNESS_ENTHUSIAST;
+        // Fitness enthusiasts and managers are auto-approved
+        return this.userType === USER_TYPES.FITNESS_ENTHUSIAST || this.userType === USER_TYPES.MANAGER;
       },
     },
     approvalStatus: {
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: function () {
-        return this.userType === USER_TYPES.FITNESS_ENTHUSIAST ? "approved" : "pending";
+        return (
+          this.userType === USER_TYPES.FITNESS_ENTHUSIAST ||
+          this.userType === USER_TYPES.MANAGER
+        )
+          ? "approved"
+          : "pending";
       },
+    },
+    // Claim/lock system for pending approvals
+    claimedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    claimedAt: {
+      type: Date,
+      default: null,
     },
     approvedBy: {
       type: String, // Admin email who approved

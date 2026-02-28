@@ -21,7 +21,7 @@ const ManageUsers = () => {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
+    Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
   });
 
   useEffect(() => { fetchUsers(); }, [filters]);
@@ -538,11 +538,10 @@ const ManageUsers = () => {
                 <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                   {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
                     <button key={page} onClick={() => handlePageChange(page)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                        page === pagination.currentPage
+                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === pagination.currentPage
                           ? 'z-10 bg-[#3f8554] border-[#3f8554] text-white'
                           : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                      } ${page === 1 ? 'rounded-l-md' : ''} ${page === pagination.totalPages ? 'rounded-r-md' : ''}`}>
+                        } ${page === 1 ? 'rounded-l-md' : ''} ${page === pagination.totalPages ? 'rounded-r-md' : ''}`}>
                       {page}
                     </button>
                   ))}

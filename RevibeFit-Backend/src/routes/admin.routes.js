@@ -32,9 +32,17 @@ import {
   getTrainerEarningsBreakdown,
   getPlatformRevenue,
   getUserActivity,
+  createManager,
+  getAllManagers,
+  removeManager,
+  getManagerActivityLog,
+  getPendingCommissionRequests,
+  handleCommissionRateRequest,
 } from "../controllers/admin.controller.js";
 import { verifyAdmin } from "../middlewares/auth.middleware.js";
 import { authLimiter } from "../middlewares/rateLimiter.middleware.js";
+import { validateObjectId } from "../middlewares/validate.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
@@ -631,5 +639,17 @@ router.post("/invoices/enforce-overdue", enforceOverdueInvoices);
  *         description: Grace period statuses
  */
 router.get("/invoices/grace-period-status", getGracePeriodStatus);
+
+// ─── Manager Management (Admin-only) ─────────────────────
+
+router.post("/managers", upload.single("profilePhoto"), createManager);
+router.get("/managers", getAllManagers);
+router.delete("/managers/:id", validateObjectId("id"), removeManager);
+router.get("/managers/:id/activity-log", validateObjectId("id"), getManagerActivityLog);
+
+// ─── Commission Rate Requests ────────────────────────────
+
+router.get("/commission-requests", getPendingCommissionRequests);
+router.patch("/commission-requests/:id/respond", validateObjectId("id"), handleCommissionRateRequest);
 
 export default router;

@@ -3,9 +3,9 @@ import logo from '../../../assets/exercise_8407005.png';
 
 const AdminNavbar = () => {
   const handleLogout = () => {
-    localStorage.removeItem('admin');
-    localStorage.removeItem('adminToken');
-    window.location.href = '/admin/login';
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    window.location.href = '/login';
   };
 
   return (
@@ -14,9 +14,9 @@ const AdminNavbar = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand Name */}
           <Link to="/admin/dashboard" className="flex items-center space-x-3">
-            <img 
-              src={logo} 
-              alt="RevibeFit Logo" 
+            <img
+              src={logo}
+              alt="RevibeFit Logo"
               className="h-10 w-10"
             />
             <span className="text-2xl font-bold text-white">

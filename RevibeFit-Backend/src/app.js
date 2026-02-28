@@ -103,6 +103,7 @@ import labPartnerRoutes from "./routes/labPartner.routes.js";
 import workoutRoutes from "./routes/workout.routes.js";
 import liveClassRoutes from "./routes/liveClass.routes.js";
 import nutritionRoutes from "./routes/nutrition.routes.js";
+import managerRoutes from "./routes/manager.routes.js";
 
 // ─── Route Declarations ─────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ app.use("/api/blogs", blogRoutes);
 app.use("/api/lab-partners", labPartnerRoutes);
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/classes", liveClassRoutes);
+app.use("/api/manager", managerRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 
 // ─── API Documentation (Swagger UI) ────────────────────────────────────────

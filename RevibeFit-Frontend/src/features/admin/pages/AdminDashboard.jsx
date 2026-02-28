@@ -151,18 +151,18 @@ const AdminDashboard = () => {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    const admin = localStorage.getItem('admin');
-    const token = localStorage.getItem('adminToken');
+    const admin = localStorage.getItem('user');
+    const token = localStorage.getItem('accessToken');
     if (!admin || !token) {
-      localStorage.removeItem('admin');
-      localStorage.removeItem('adminToken');
-      navigate('/admin/login');
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+      navigate('/login');
     }
   }, [navigate]);
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('accessToken');
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       const response = await fetch(`${apiUrl}/api/admin/dashboard-analytics`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -174,9 +174,9 @@ const AdminDashboard = () => {
         setError('');
         setLastUpdated(new Date());
       } else if (response.status === 401) {
-        localStorage.removeItem('admin');
-        localStorage.removeItem('adminToken');
-        navigate('/admin/login');
+        localStorage.removeItem('user');
+        localStorage.removeItem('accessToken');
+        navigate('/login');
       } else {
         setError(result.message || 'Failed to load dashboard');
       }

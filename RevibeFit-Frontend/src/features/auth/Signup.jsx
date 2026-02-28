@@ -3,6 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import signupBg from '../../assets/escape_your_limits.jpg';
 
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
+  "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim",
+  "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand",
+  "West Bengal", "Delhi", "Jammu and Kashmir", "Ladakh",
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
+  "Lakshadweep", "Puducherry",
+];
+
 const Signup = () => {
   const navigate = useNavigate();
   const [userType, setUserType] = useState('fitness-enthusiast');
@@ -14,14 +25,16 @@ const Signup = () => {
     confirmPassword: '',
     phone: '',
     age: '',
-    
+    city: '',
+    state: '',
+
     // Fitness Enthusiast specific
     fitnessGoal: '',
-    
+
     // Trainer specific
     specialization: '',
     certifications: null,
-    
+
     // Lab Partner specific
     laboratoryName: '',
     laboratoryAddress: '',
@@ -106,7 +119,7 @@ const Signup = () => {
       ...prev,
       [name]: type === 'file' ? files[0] : value
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -123,7 +136,7 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
       setLoading(true);
       try {
@@ -135,11 +148,11 @@ const Signup = () => {
           }
         });
         submitData.append('userType', userType);
-        
+
         console.log('Submitting signup data...');
         console.log('User Type:', userType);
         console.log('Form Data:', Object.fromEntries(submitData));
-        
+
         // Make API call to backend
         const response = await fetch('http://localhost:8000/api/auth/signup', {
           method: 'POST',
@@ -169,7 +182,7 @@ const Signup = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Image */}
-      <div 
+      <div
         className="hidden lg:block lg:w-2/5 bg-cover bg-center relative"
         style={{ backgroundImage: `url(${signupBg})` }}
       >
@@ -188,7 +201,7 @@ const Signup = () => {
 
       {/* Right Side - Signup Form */}
       <div className="w-full lg:w-3/5 flex items-center justify-center p-8 bg-[#fffff0] overflow-y-auto">
-        <motion.div 
+        <motion.div
           className="max-w-2xl w-full my-8"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -208,11 +221,10 @@ const Signup = () => {
               <button
                 type="button"
                 onClick={() => handleUserTypeChange('fitness-enthusiast')}
-                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                  userType === 'fitness-enthusiast'
-                    ? 'border-[#3f8554] bg-[#3f8554] text-white'
-                    : 'border-gray-300 hover:border-[#3f8554]'
-                }`}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 ${userType === 'fitness-enthusiast'
+                  ? 'border-[#3f8554] bg-[#3f8554] text-white'
+                  : 'border-gray-300 hover:border-[#3f8554]'
+                  }`}
               >
                 <div className="text-center">
                   <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,15 +233,14 @@ const Signup = () => {
                   <span className="font-semibold text-sm">Fitness Enthusiast</span>
                 </div>
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => handleUserTypeChange('trainer')}
-                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                  userType === 'trainer'
-                    ? 'border-[#3f8554] bg-[#3f8554] text-white'
-                    : 'border-gray-300 hover:border-[#3f8554]'
-                }`}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 ${userType === 'trainer'
+                  ? 'border-[#3f8554] bg-[#3f8554] text-white'
+                  : 'border-gray-300 hover:border-[#3f8554]'
+                  }`}
               >
                 <div className="text-center">
                   <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,15 +249,14 @@ const Signup = () => {
                   <span className="font-semibold text-sm">Trainer</span>
                 </div>
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => handleUserTypeChange('lab-partner')}
-                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                  userType === 'lab-partner'
-                    ? 'border-[#3f8554] bg-[#3f8554] text-white'
-                    : 'border-gray-300 hover:border-[#3f8554]'
-                }`}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 ${userType === 'lab-partner'
+                  ? 'border-[#3f8554] bg-[#3f8554] text-white'
+                  : 'border-gray-300 hover:border-[#3f8554]'
+                  }`}
               >
                 <div className="text-center">
                   <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -357,6 +367,42 @@ const Signup = () => {
                   placeholder="Confirm your password"
                 />
                 {errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>}
+              </div>
+            </div>
+
+            {/* Location Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  City *
+                </label>
+                <input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border ${errors.city ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent`}
+                  placeholder="Enter your city"
+                />
+                {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  State *
+                </label>
+                <select
+                  name="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border ${errors.state ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent bg-white`}
+                >
+                  <option value="">Select your state</option>
+                  {INDIAN_STATES.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+                {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
               </div>
             </div>
 

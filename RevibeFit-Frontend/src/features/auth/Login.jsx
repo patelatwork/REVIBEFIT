@@ -8,7 +8,6 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    userType: 'fitness-enthusiast'
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -51,41 +50,56 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
       setLoading(true);
       try {
-        // Make API call to backend
+        // Make API call to unified login endpoint
         const response = await fetch('http://localhost:8000/api/auth/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          credentials: 'include', // Include cookies
-          body: JSON.stringify(formData),
+          credentials: 'include',
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-          // Show appropriate message for approval-related errors
           if (response.status === 403) {
             throw new Error(data.message || 'Your account is pending approval');
           }
           throw new Error(data.message || 'Login failed');
         }
 
-        // Store user data in localStorage
+        // Store user data in localStorage (unified for all roles)
         localStorage.setItem('user', JSON.stringify(data.data.user));
         localStorage.setItem('accessToken', data.data.accessToken);
 
-        // Navigate based on user type
-        if (formData.userType === 'fitness-enthusiast') {
-          navigate('/fitness-enthusiast/dashboard');
-        } else if (formData.userType === 'trainer') {
-          navigate('/trainer/dashboard');
-        } else if (formData.userType === 'lab-partner') {
-          navigate('/lab-partner/dashboard');
+        // Navigate based on user type returned from backend
+        const userType = data.data.user.userType;
+        switch (userType) {
+          case 'fitness-enthusiast':
+            navigate('/fitness-enthusiast/dashboard');
+            break;
+          case 'trainer':
+            navigate('/trainer/dashboard');
+            break;
+          case 'lab-partner':
+            navigate('/lab-partner/dashboard');
+            break;
+          case 'manager':
+            navigate('/manager/dashboard');
+            break;
+          case 'admin':
+            navigate('/admin/dashboard');
+            break;
+          default:
+            navigate('/');
         }
       } catch (error) {
         setErrors({ submit: error.message || 'Login failed. Please try again.' });
@@ -98,7 +112,7 @@ const Login = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Image */}
-      <div 
+      <div
         className="hidden lg:block lg:w-1/2 bg-cover bg-center relative"
         style={{ backgroundImage: `url(${loginBg})` }}
       >
@@ -117,7 +131,7 @@ const Login = () => {
 
       {/* Right Side - Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-[#fffff0]">
-        <motion.div 
+        <motion.div
           className="max-w-md w-full"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -129,23 +143,6 @@ const Login = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* User Type Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                I am a
-              </label>
-              <select
-                name="userType"
-                value={formData.userType}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent"
-              >
-                <option value="fitness-enthusiast">Fitness Enthusiast</option>
-                <option value="trainer">Trainer</option>
-                <option value="lab-partner">Lab Partner</option>
-              </select>
-            </div>
-
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -218,13 +215,6 @@ const Login = () => {
                 Sign Up
               </Link>
             </p>
-
-            {/* Admin Login Link */}
-            <div className="text-center pt-4 border-t border-gray-200">
-              <Link to="/admin/login" className="text-sm text-gray-500 hover:text-[#3f8554]">
-                Admin Login →
-              </Link>
-            </div>
           </form>
         </motion.div>
       </div>

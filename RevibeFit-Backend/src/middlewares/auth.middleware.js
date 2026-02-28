@@ -100,3 +100,126 @@ export const verifyUserType = (...allowedTypes) => {
     next();
   };
 };
+
+/**
+ * Middleware that allows access for EITHER admin (env-based) OR manager (DB-based).
+ * - Admin: JWT contains { isAdmin: true, userType: "admin" } → sets req.adminUser
+ * - Manager: JWT contains { _id } → looks up User document → sets req.user + req.managerUser
+ */
+export const verifyManagerOrAdmin = asyncHandler(async (req, res, next) => {
+  try {
+    const token =
+      req.cookies?.accessToken ||
+      req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      throw new ApiError(401, "Unauthorized - No token provided");
+    }
+
+    const decoded = jwt.verify(token, config.jwtSecret);
+
+    // Path 1: Admin (env-based credentials)
+    if (decoded.isAdmin && decoded.userType === "admin") {
+      req.adminUser = {
+        email: decoded.email,
+        userType: decoded.userType,
+        isAdmin: true,
+      };
+      return next();
+    }
+
+    // Path 2: Manager (DB-based user)
+    const user = await User.findById(decoded._id).select(
+      "-password -refreshToken"
+    );
+
+    if (!user) {
+      throw new ApiError(401, "Invalid access token");
+    }
+
+    if (user.userType !== "manager") {
+      throw new ApiError(403, "Access denied - Manager or Admin privileges required");
+    }
+
+    if (!user.isActive) {
+      throw new ApiError(403, "Your account has been deactivated");
+    }
+
+    if (user.isSuspended) {
+      throw new ApiError(
+        403,
+        `Your account has been suspended. Reason: ${user.suspensionReason}`
+      );
+    }
+
+    req.user = user;
+    req.managerUser = {
+      email: user.email,
+      name: user.name,
+      userType: "manager",
+      assignedRegion: user.assignedRegion,
+    };
+    next();
+  } catch (error) {
+    throw new ApiError(
+      401,
+      error?.message || "Invalid access token"
+    );
+  }
+});
+
+/**
+ * Middleware to verify manager JWT tokens (manager-only routes).
+ * Must be a DB-based user with userType "manager".
+ */
+export const verifyManager = asyncHandler(async (req, res, next) => {
+  try {
+    const token =
+      req.cookies?.accessToken ||
+      req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      throw new ApiError(401, "Unauthorized - No token provided");
+    }
+
+    const decoded = jwt.verify(token, config.jwtSecret);
+
+    const user = await User.findById(decoded._id).select(
+      "-password -refreshToken"
+    );
+
+    if (!user) {
+      throw new ApiError(401, "Invalid access token");
+    }
+
+    if (user.userType !== "manager") {
+      throw new ApiError(403, "Access denied - Manager privileges required");
+    }
+
+    if (!user.isActive) {
+      throw new ApiError(403, "Your account has been deactivated");
+    }
+
+    if (user.isSuspended) {
+      throw new ApiError(
+        403,
+        `Your account has been suspended. Reason: ${user.suspensionReason}`
+      );
+    }
+
+    req.user = user;
+    req.managerUser = {
+      email: user.email,
+      name: user.name,
+      userType: "manager",
+      assignedRegion: user.assignedRegion,
+    };
+    next();
+  } catch (error) {
+    throw new ApiError(
+      401,
+      error?.message || "Invalid access token"
+    );
+  }
+});
+

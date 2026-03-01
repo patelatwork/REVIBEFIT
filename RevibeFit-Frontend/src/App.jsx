@@ -43,7 +43,13 @@ import LabEarningsAnalytics from './features/admin/pages/LabEarningsAnalytics'
 import ManagerDashboard from './features/manager/pages/ManagerDashboard'
 import ManagerPendingApprovals from './features/manager/pages/ManagerPendingApprovals'
 import ManagerUsers from './features/manager/pages/ManagerUsers'
+import ManagerInvoices from './features/manager/pages/ManagerInvoices'
+import ManagerEarnings from './features/manager/pages/ManagerEarnings'
+import ManagerCommissionRequests from './features/manager/pages/ManagerCommissionRequests'
+import ManagerProfile from './features/manager/pages/ManagerProfile'
 import AdminManagers from './features/admin/pages/AdminManagers'
+import ForgotPassword from './features/auth/ForgotPassword'
+import ResetPassword from './features/auth/ResetPassword'
 
 function App() {
   const [user, setUser] = useState(null);
@@ -81,6 +87,8 @@ function App() {
         {/* Routes without Navbar and Footer */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         {/* Admin Routes (no navbar/footer) */}
 
@@ -96,6 +104,10 @@ function App() {
         <Route path="/manager/dashboard" element={<ManagerDashboard />} />
         <Route path="/manager/pending-approvals" element={<ManagerPendingApprovals />} />
         <Route path="/manager/users" element={<ManagerUsers />} />
+        <Route path="/manager/invoices" element={<ManagerInvoices />} />
+        <Route path="/manager/earnings" element={<ManagerEarnings />} />
+        <Route path="/manager/commission-requests" element={<ManagerCommissionRequests />} />
+        <Route path="/manager/profile" element={<ManagerProfile />} />
 
         {/* Trainer Dashboard (custom navbar, no footer) */}
         <Route path="/trainer/dashboard" element={<TrainerDashboard />} />

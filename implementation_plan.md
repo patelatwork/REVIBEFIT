@@ -1,252 +1,170 @@
-# Manager Type Split: Trainer Manager & Lab Manager
+# Manager Pages, Change Password & Forgot Password Implementation
 
-Split the single generic "manager" role into two scoped types — **Trainer Manager** and **Lab Manager** — with distinct access control, dashboards, and BI-ready activity logging.
+Build 4 missing Lab Manager frontend pages, 2 missing Trainer Manager frontend pages, implement Change Password across all user profiles, and fully implement Forgot Password with email-based reset.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Fitness Enthusiast visibility**: FEs with no trainer bookings or lab bookings are visible to **neither** manager type — only admin sees them. Both manager types can see FEs who are associated with their domain (via bookings), but each only sees domain-relevant data.
+> **Scope is large** — 6 new frontend pages, 4 new backend endpoints, modifications to 5 existing files. This will be done in phases: first backend API additions, then frontend pages, then cross-cutting password features.
 
 > [!WARNING]
-> **Cross-domain suspension**: When any manager suspends a fitness enthusiast, it's a full account suspension affecting both domains. This was chosen for simplicity — it's the user's explicit preference.
-
-> [!IMPORTANT]
-> **`department` field removal**: The `department` field is being replaced by `managerType`. Since no existing managers exist in the database, no migration is needed.
+> **Forgot Password sends real emails** via the Gmail SMTP already configured in [.env](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/.env). The reset link will point to `http://localhost:5173/reset-password/:token` (dev only).
 
 ---
 
 ## Proposed Changes
 
-### Constants & Data Models
+### Backend — Password APIs
 
-#### [MODIFY] [constants.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/constants.js)
-Add `MANAGER_TYPES` enum:
-```js
-export const MANAGER_TYPES = {
-  TRAINER_MANAGER: "trainer_manager",
-  LAB_MANAGER: "lab_manager",
-};
-```
+#### [MODIFY] [auth.controller.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/controllers/auth.controller.js)
 
----
+Add 3 new endpoints:
+
+1. **`changePassword`** — Requires auth. Takes `currentPassword` and `newPassword`. Verifies current password with [comparePassword()](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/models/user.model.js#291-299), then updates and saves (triggering the pre-save hash hook).
+
+2. **`forgotPassword`** — Public. Takes `email`. Generates a crypto random token, hashes it, stores `passwordResetToken` + `passwordResetExpires` (1 hour) on the user, and calls `sendPasswordResetEmail()` with the reset link.
+
+3. **`resetPassword`** — Public. Takes `token` and `newPassword`. Hashes the token, finds user by `passwordResetToken` where `passwordResetExpires > now`, sets new password, clears reset fields.
+
+#### [MODIFY] [auth.routes.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/routes/auth.routes.js)
+
+Add 3 routes:
+- `POST /api/auth/change-password` (protected with `verifyJWT`)
+- `POST /api/auth/forgot-password` (public, rate-limited)
+- `POST /api/auth/reset-password/:token` (public, rate-limited)
 
 #### [MODIFY] [user.model.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/models/user.model.js)
-1. **Replace** `department` field with `managerType`:
-```js
-managerType: {
-  type: String,
-  enum: ["trainer_manager", "lab_manager"],
-  required: function() { return this.userType === USER_TYPES.MANAGER; },
-  default: null,
-},
-```
-2. **Add** `reportsTo` field (for future hierarchy):
-```js
-reportsTo: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "User",
-  default: null,
-},
-```
-3. **Enhance** `approvedBy` from `String` to `mongoose.Schema.Types.ObjectId` (ref: "User"). Keep `String` for backward compat but add new `approvedByRef` field with ObjectId.
+
+Add 2 fields:
+- `passwordResetToken` (String, select: false)
+- `passwordResetExpires` (Date, select: false)
+
+#### [MODIFY] [emailService.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/utils/emailService.js)
+
+Add `sendPasswordResetEmail(user, resetUrl)` — HTML email with a branded reset link button, matching existing email template style.
 
 ---
 
-#### [MODIFY] [managerActivityLog.model.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/models/managerActivityLog.model.js)
-Upgrade to BI-standard event schema:
-```js
-managerType: { type: String, enum: ["trainer_manager", "lab_manager"], required: true },
-region: { type: String, required: true },
-targetUserType: { type: String, default: null },
-```
-- Add `SUSPEND_TRAINER`, `UNSUSPEND_TRAINER`, `REQUEST_TRAINER_COMMISSION_CHANGE` to action enum
-- Add index: `{ managerType: 1, region: 1, createdAt: -1 }`
-- **Remove** TTL index (immutable historical logs per BI requirement)
+### Frontend — Manager Pages
+
+#### [NEW] [ManagerInvoices.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerInvoices.jsx)
+
+**Lab Manager only.** Full invoice management page:
+- **Filters bar:** Status dropdown (all/payment_due/paid/overdue/cancelled), Lab Partner search, Billing Period (month/year), Sort by (due date, amount, generated date)
+- **Invoice table:** Invoice #, Lab Partner name, Billing Period, Amount, Commission, Status badge, Due Date, Actions
+- **Expandable rows:** Click to see commission breakdown (each booking: enthusiast name, test names, booking date, amounts)
+- **Action buttons:** "Mark as Paid" (with confirmation dialog), view details
+- **Generate Invoice modal:** Select lab partner dropdown (pre-loaded from `/api/manager/lab-partners/commission-rates`), pick month/year, set due day, submit
+- **Enforce Overdue button:** Batch enforcement of all overdue invoices with confirmation
+- **Grace Period Status:** Section showing labs near grace period expiry
+- Uses [ManagerSidebar](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/components/ManagerSidebar.jsx#30-171), `framer-motion`, `lucide-react` — consistent with dashboard design
+
+#### [NEW] [ManagerEarnings.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerEarnings.jsx)
+
+**Lab Manager only.** Analytics dashboard:
+- **Revenue Over Time chart:** Line/area chart using pure SVG (no charting library) showing monthly lab earnings for the region. Time period filter (last 6 months, last year, custom)
+- **Top Lab Partners table:** Ranked list from `/api/manager/analytics/lab-earnings/top-partners` with lab name, total revenue, commission earned, bookings count
+- **Platform Revenue Summary cards:** Total revenue, total commission collected, avg commission rate, active lab partners  
+- **Time period filter:** Dropdown to switch between 30 days, 90 days, 6 months, 1 year
+- Consistent manager dashboard design
+
+#### [NEW] [ManagerCommissionRequests.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerCommissionRequests.jsx)
+
+**Both Lab Manager & Trainer Manager.** Two-section layout:
+
+**Section 1 — My Commission Requests:**
+- Table showing all past requests: target user name/type, current rate, proposed rate, reason, status badge (pending/approved/denied), admin response if any, submitted date
+- All requests shown (no time limit)
+
+**Section 2 — New Request Form:**
+- User dropdown pre-filtered by manager type (lab partners for Lab Manager, trainers for Trainer Manager) — loaded from `/api/manager/lab-partners/commission-rates` or `/api/manager/users?type=trainer`
+- Shows current commission rate when user selected
+- Proposed rate input (number, 0-100)
+- Reason textarea (required)
+- Submit button
+
+#### [NEW] [ManagerProfile.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerProfile.jsx)
+
+**Both Lab Manager & Trainer Manager.** Follows manager dashboard design:
+
+**Profile Header:**
+- Profile photo (with upload support via `PUT /api/manager/profile` with `profilePhoto` multipart)
+- Name, role badge, region badge
+
+**Profile Details Grid:**
+- **Editable fields:** Phone, Age, Profile Photo
+- **Read-only fields:** Name, Email, Assigned Region, Manager Type, City, State
+
+**Read-Only Stats Section:**
+- Member since date
+- Total approvals handled (from existing activity data)
+- Commission requests submitted count
+
+**Change Password Section:**
+- Current password, New password, Confirm new password inputs
+- Password requirements display (min 8 chars)
+- Submit calls `POST /api/auth/change-password`
 
 ---
 
-### Auth & Middleware
+### Frontend — Password Pages
 
-#### [MODIFY] [auth.middleware.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/middlewares/auth.middleware.js)
-- In `verifyManager` and `verifyManagerOrAdmin`, attach `managerType` to `req.managerUser`:
-```diff
- req.managerUser = {
-   email: user.email,
-   name: user.name,
-   userType: "manager",
-+  managerType: user.managerType,
-   assignedRegion: user.assignedRegion,
- };
-```
-- Add two new middleware helpers:
-```js
-export const verifyTrainerManager = asyncHandler(async (req, res, next) => {
-  // Runs after verifyManager, checks req.user.managerType === "trainer_manager"
-});
-export const verifyLabManager = asyncHandler(async (req, res, next) => {
-  // Runs after verifyManager, checks req.user.managerType === "lab_manager"
-});
-```
+#### [NEW] [ForgotPassword.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/auth/ForgotPassword.jsx)
+
+Simple centered card (matching login page design):
+- Email input field
+- Submit button → calls `POST /api/auth/forgot-password`
+- Success message: "If an account exists with this email, a reset link has been sent."
+- Back to Login link
+
+#### [NEW] [ResetPassword.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/auth/ResetPassword.jsx)
+
+Centered card:
+- Reads `:token` from URL params
+- New Password + Confirm Password inputs
+- Submit → calls `POST /api/auth/reset-password/:token`
+- On success: redirect to `/login` with success message
+- On error: show "Invalid or expired reset link. Please request a new one."
 
 ---
 
-#### [MODIFY] [activityLogger.middleware.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/middlewares/activityLogger.middleware.js)
-Enrich log entries with `managerType` and `region`:
-```diff
- await ManagerActivityLog.create({
-   managerId,
-+  managerType: req.user?.managerType,
-+  region: req.user?.assignedRegion,
-   action,
-   targetModel,
-   targetId,
--  details,
-+  details: { ...details, targetUserType: details.userType || null },
-   ipAddress: ...
- });
-```
+### Frontend — Add Change Password to Existing Profiles
+
+#### [MODIFY] [TrainerProfile.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/trainer/pages/TrainerProfile.jsx)
+
+Add a "Change Password" collapsible section below the profile form with current/new/confirm password fields.
+
+#### [MODIFY] [LabProfile.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/lab-partner/pages/LabProfile.jsx)
+
+Same — add "Change Password" collapsible section.
 
 ---
 
-### Manager Controller (Major Changes)
+### Routing
 
-#### [MODIFY] [manager.controller.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/controllers/manager.controller.js)
+#### [MODIFY] [App.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/App.jsx)
 
-**Helper — get allowed user types by manager type:**
-```js
-const getAllowedUserTypes = (managerType) => {
-  if (managerType === "trainer_manager") return [USER_TYPES.TRAINER];
-  if (managerType === "lab_manager") return [USER_TYPES.LAB_PARTNER];
-  return [];
-};
-```
-
-**`getPendingApprovals` (line 101):** Filter `userType` by `getAllowedUserTypes(req.user.managerType)` instead of both.
-
-**`claimApproval` (line 116):** Add check: target user's type must be in `getAllowedUserTypes`.
-
-**`approveUser` (line 161) / `rejectUser` (line 195):** Add guard — target user type must match manager's scope.
-
-**`getAllUsers` (line 223):** 
-- Trainer Manager: default filter to `userType: { $in: [TRAINER] }`. If FE filter selected, query FEs who have ClassBookings with trainers in this region.
-- Lab Manager: default filter to `userType: { $in: [LAB_PARTNER] }`. If FE filter selected, query FEs who have LabBookings with lab partners in this region.
-
-**`toggleUserSuspension` (line 253):**
-- Trainer Manager: can only suspend `trainer` or `fitness-enthusiast` types
-- Lab Manager: can only suspend `lab-partner` or `fitness-enthusiast` types
-
-**`getUserStats` (line 278):** Return only relevant counts per manager type.
-
-**`getUserActivity` (line 295):** 
-- For FE viewed by Trainer Manager: return only `classBookings`, `workouts`, `blogReadings` — omit `labBookings`
-- For FE viewed by Lab Manager: return only `labBookings` — omit `classBookings`, `workouts`
-- For trainers: only Trainer Manager can view
-- For lab partners: only Lab Manager can view
-
-**`requestCommissionRateChange` (line 407):** Scope `targetUserType` filter by manager type.
-
-**Lab-specific endpoints** (lines 346–675: `getLabPartnersWithCommissionRates`, `suspendLabForNonPayment`, `unsuspendLab`, all invoice management, `getInvoiceRequests`, `getGracePeriodStatus`): Add guard at top — `if (req.user.managerType !== "lab_manager") throw 403`.
-
-**`getDashboardAnalytics` (line 679):** Return different dashboard payload per manager type.
-- **Trainer Manager dashboard:** user counts (trainers + associated FEs), class stats, class-related bookings, pending trainer approvals, trainer earnings overview.
-- **Lab Manager dashboard:** user counts (lab partners + associated FEs), lab booking stats, invoices, commission stats, pending lab partner approvals.
-
-**Analytics endpoints** (lines 739–834): Scope each by manager type — `getMonthlyGrowth` shows only relevant user types, `getUserDistribution` shows only scope-relevant types, `getLabEarningsOverTime`/`getTopLabPartners` are lab-manager-only, `getPlatformRevenue` returns only the relevant commission type.
-
----
-
-### Admin Controller
-
-#### [MODIFY] [admin.controller.js](file:///Users/krxna/main/revibefit/RevibeFit-Backend/src/controllers/admin.controller.js)
-
-**`createManager` (line 2537):**
-```diff
-- const { name, email, password, phone, age, assignedRegion, department } = req.body;
-+ const { name, email, password, phone, age, assignedRegion, managerType } = req.body;
-
-- if (!name || !email || !password) {
-+ if (!name || !email || !password || !managerType || !age) {
-+   throw new ApiError(STATUS_CODES.BAD_REQUEST, "Name, email, password, age, and manager type are required");
-
-+ if (!["trainer_manager", "lab_manager"].includes(managerType)) {
-+   throw new ApiError(STATUS_CODES.BAD_REQUEST, "Manager type must be 'trainer_manager' or 'lab_manager'");
-+ }
-
-  const manager = await User.create({
-    ...
--   department: department || null,
-+   managerType,
-    ...
-  });
-```
-
----
-
-### Frontend Changes
-
-#### [MODIFY] [AdminManagers.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/admin/pages/AdminManagers.jsx)
-1. Replace `department` text field with `managerType` dropdown (two options: "Trainer Manager", "Lab Manager")
-2. Add mandatory [age](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerUsers.jsx#9-210) number input field
-3. Update form state: replace `department` key with `managerType`, add [age](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerUsers.jsx#9-210)
-4. Show manager type badge on each manager card (color-coded)
-5. Update `createForm` reset to include  `managerType` and [age](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerUsers.jsx#9-210)
-
----
-
-#### [MODIFY] [ManagerSidebar.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/components/ManagerSidebar.jsx)
-Accept `managerType` prop and conditionally filter `navItems`:
-- **Trainer Manager sidebar:** Dashboard, Approvals, Users, Commission Requests, Profile
-- **Lab Manager sidebar:** Dashboard, Approvals, Users, Invoices, Earnings, Commission Requests, Profile
-- Display manager type badge below region badge
-
----
-
-#### [MODIFY] [ManagerDashboard.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerDashboard.jsx)
-Read `managerType` from localStorage user object and render type-specific content:
-- **Trainer Manager:** Stats → Total Trainers, Pending Trainer Approvals, Active Trainers, Class Bookings. Breakdown → Trainers only. Quick Actions → Review Trainer Approvals, Manage Trainers.
-- **Lab Manager:** Stats → Total Lab Partners, Pending Lab Approvals, Overdue Invoices, Active Labs. Breakdown → Lab Partners, Invoice Summary. Quick Actions → Review Lab Approvals, Manage Invoices, Manage Labs.
-
----
-
-#### [MODIFY] [ManagerUsers.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerUsers.jsx)
-Update userType filter dropdown:
-- **Trainer Manager:** "All Types" → only "Trainers" and "Fitness Enthusiasts" options
-- **Lab Manager:** "All Types" → only "Lab Partners" and "Fitness Enthusiasts" options
-
----
-
-#### [MODIFY] [ManagerPendingApprovals.jsx](file:///Users/krxna/main/revibefit/RevibeFit-Frontend/src/features/manager/pages/ManagerPendingApprovals.jsx)
-No changes needed — backend filters by manager type. The frontend already shows generic user data.
+Add routes:
+- `/manager/invoices` → `ManagerInvoices`
+- `/manager/earnings` → `ManagerEarnings`
+- `/manager/commission-requests` → `ManagerCommissionRequests`
+- `/manager/profile` → `ManagerProfile`
+- `/forgot-password` → `ForgotPassword`
+- `/reset-password/:token` → `ResetPassword`
 
 ---
 
 ## Verification Plan
 
-### Browser Tests
-1. **Admin creates a Trainer Manager:**
-   - Open `http://localhost:5173/admin/managers`
-   - Click "Add Manager" → fill form with managerType = "Trainer Manager"
-   - Verify the new manager card shows "Trainer Manager" badge
-   - Log in as the new Trainer Manager
-   - Verify sidebar shows: Dashboard, Approvals, Users, Commission Requests, Profile (no Invoices/Earnings)
-   - Verify dashboard shows trainer-focused stats (no Invoice Summary)
-   - Navigate to Pending Approvals → only trainer approvals should appear
-   - Navigate to Users → filter dropdown only shows "Trainers" and "Fitness Enthusiasts"
+### Browser Testing
 
-2. **Admin creates a Lab Manager:**
-   - Same flow but with managerType = "Lab Manager"
-   - Verify sidebar includes Invoices and Earnings
-   - Verify dashboard shows lab-focused stats with Invoice Summary
-   - Pending Approvals shows only lab partner approvals
-   - Users filter shows only "Lab Partners" and "Fitness Enthusiasts"
+Since there are no existing automated tests in this project, we will verify all changes via browser testing:
 
-3. **Cross-domain denial:**
-   - As Trainer Manager, attempt to navigate to `/manager/invoices` → page should be empty or show access denied
-   - As Lab Manager, verify no trainer-specific data appears
-
-### API Verification
-Use `curl` or browser dev tools to verify:
-1. Trainer Manager calls `GET /api/manager/pending-approvals` → only trainers returned
-2. Lab Manager calls `GET /api/manager/pending-approvals` → only lab partners returned
-3. Trainer Manager calls `POST /api/manager/approve/:labPartnerId` → rejected with 403
-4. Lab Manager calls `PATCH /api/manager/users/:trainerId/suspend` → rejected with 403
+1. **Manager Profile (both types):** Navigate to `/manager/profile` as both trainer_manager and lab_manager accounts → verify profile loads, editable fields work, photo upload works, change password works
+2. **Manager Commission Requests:** Navigate to `/manager/commission-requests` → verify request list loads, new request form pre-filters by manager type, submission works
+3. **Manager Invoices (lab_manager only):** Navigate to `/manager/invoices` → verify invoice list, filters, expandable breakdown, generate invoice modal, mark as paid
+4. **Manager Earnings (lab_manager only):** Navigate to `/manager/earnings` → verify charts render, time filter works, top partners table loads
+5. **Forgot Password flow:** Click "Forgot Password?" on login → enter email → verify email is sent → click reset link → set new password → login with new password
+6. **Change Password on TrainerProfile:** Login as trainer → go to profile → change password → logout → login with new password
+7. **Change Password on LabProfile:** Same flow for lab partner
+8. **Sidebar navigation:** Verify all sidebar links navigate to correct pages, active states work

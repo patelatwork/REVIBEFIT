@@ -5,6 +5,8 @@ import { User } from "../models/user.model.js";
 import { STATUS_CODES, USER_TYPES } from "../constants.js";
 import config from "../config/index.js";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import { sendPasswordResetEmail } from "../utils/emailService.js";
 
 // Generate access and refresh tokens
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -323,4 +325,165 @@ const logout = asyncHandler(async (req, res) => {
     .json(new ApiResponse(STATUS_CODES.SUCCESS, {}, "User logged out successfully"));
 });
 
-export { signup, login, logout };
+// @desc    Change password (authenticated user)
+// @route   POST /api/auth/change-password
+// @access  Private
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "Current password and new password are required"
+    );
+  }
+
+  if (newPassword.length < 8) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "New password must be at least 8 characters"
+    );
+  }
+
+  if (currentPassword === newPassword) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "New password must be different from current password"
+    );
+  }
+
+  const user = await User.findById(req.user._id).select("+password");
+  if (!user) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found");
+  }
+
+  const isPasswordValid = await user.comparePassword(currentPassword);
+  if (!isPasswordValid) {
+    throw new ApiError(STATUS_CODES.UNAUTHORIZED, "Current password is incorrect");
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return res
+    .status(STATUS_CODES.SUCCESS)
+    .json(new ApiResponse(STATUS_CODES.SUCCESS, {}, "Password changed successfully"));
+});
+
+// @desc    Forgot password — send reset email
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Email is required");
+  }
+
+  const user = await User.findOne({ email });
+
+  // Always return success to prevent email enumeration
+  if (!user) {
+    return res
+      .status(STATUS_CODES.SUCCESS)
+      .json(
+        new ApiResponse(
+          STATUS_CODES.SUCCESS,
+          {},
+          "If an account exists with this email, a password reset link has been sent."
+        )
+      );
+  }
+
+  // Generate a random token
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  // Hash the token and store it on the user
+  user.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+  user.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+
+  await user.save({ validateBeforeSave: false });
+
+  // Build reset URL
+  const frontendUrl = config.corsOrigin || "http://localhost:5173";
+  const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+  try {
+    await sendPasswordResetEmail(user, resetUrl);
+  } catch (err) {
+    // If email fails, clear the reset fields
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+    console.error("Failed to send password reset email:", err);
+  }
+
+  return res
+    .status(STATUS_CODES.SUCCESS)
+    .json(
+      new ApiResponse(
+        STATUS_CODES.SUCCESS,
+        {},
+        "If an account exists with this email, a password reset link has been sent."
+      )
+    );
+});
+
+// @desc    Reset password using token
+// @route   POST /api/auth/reset-password/:token
+// @access  Public
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "New password is required");
+  }
+
+  if (newPassword.length < 8) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "Password must be at least 8 characters"
+    );
+  }
+
+  // Hash the token from the URL to compare with the stored hash
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: Date.now() },
+  }).select("+password +passwordResetToken +passwordResetExpires");
+
+  if (!user) {
+    throw new ApiError(
+      STATUS_CODES.BAD_REQUEST,
+      "Invalid or expired password reset link. Please request a new one."
+    );
+  }
+
+  // Set new password and clear reset fields
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+
+  return res
+    .status(STATUS_CODES.SUCCESS)
+    .json(
+      new ApiResponse(
+        STATUS_CODES.SUCCESS,
+        {},
+        "Password has been reset successfully. You can now log in with your new password."
+      )
+    );
+});
+
+export { signup, login, logout, changePassword, forgotPassword, resetPassword };
+

@@ -22,9 +22,12 @@ export const logManagerActivity = async (
 
         await ManagerActivityLog.create({
             managerId,
+            managerType: req.user?.managerType,
+            region: req.user?.assignedRegion,
             action,
             targetModel,
             targetId,
+            targetUserType: details.userType || null,
             details,
             ipAddress:
                 req.ip || req.headers["x-forwarded-for"] || req.socket?.remoteAddress,

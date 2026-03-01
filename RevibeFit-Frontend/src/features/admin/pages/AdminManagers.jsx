@@ -22,7 +22,7 @@ const AdminManagers = () => {
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', phone: '', assignedRegion: '', department: '' });
+    const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', phone: '', age: '', assignedRegion: '', managerType: '' });
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState('');
     const [activityLog, setActivityLog] = useState(null);
@@ -53,7 +53,7 @@ const AdminManagers = () => {
 
     const handleCreate = async (e) => {
         e.preventDefault();
-        if (!createForm.name || !createForm.email || !createForm.password) { setCreateError('Name, email, password required'); return; }
+        if (!createForm.name || !createForm.email || !createForm.password || !createForm.phone || !createForm.managerType || !createForm.age) { setCreateError('Name, email, password, phone, age, and manager type are required'); return; }
         setCreateLoading(true); setCreateError('');
         try {
             const res = await fetch(`${API}/managers`, {
@@ -62,7 +62,7 @@ const AdminManagers = () => {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
-            setShowCreate(false); setCreateForm({ name: '', email: '', password: '', phone: '', assignedRegion: '', department: '' });
+            setShowCreate(false); setCreateForm({ name: '', email: '', password: '', phone: '', age: '', assignedRegion: '', managerType: '' });
             fetchManagers();
         } catch (err) { setCreateError(err.message); } finally { setCreateLoading(false); }
     };
@@ -163,8 +163,12 @@ const AdminManagers = () => {
                                         </span>
                                     </div>
                                     <div className="space-y-2 mb-4">
+                                        {mgr.managerType && (
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${mgr.managerType === 'trainer_manager' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'}`}>
+                                                {mgr.managerType === 'trainer_manager' ? '🏋️ Trainer Manager' : '🧪 Lab Manager'}
+                                            </span>
+                                        )}
                                         <p className="text-sm text-gray-600"><span className="font-medium">Region:</span> {mgr.assignedRegion || 'Not assigned'}</p>
-                                        {mgr.department && <p className="text-sm text-gray-600"><span className="font-medium">Dept:</span> {mgr.department}</p>}
                                         <p className="text-sm text-gray-600"><span className="font-medium">Recent actions:</span> {mgr.recentActions || 0} (30 days)</p>
                                         <p className="text-xs text-gray-400">Created: {new Date(mgr.createdAt).toLocaleDateString()}</p>
                                     </div>
@@ -197,12 +201,17 @@ const AdminManagers = () => {
                             <input value={createForm.name} onChange={(e) => setCreateForm(p => ({ ...p, name: e.target.value }))} placeholder="Full Name *" className="w-full px-4 py-3 border rounded-lg text-sm" />
                             <input type="email" value={createForm.email} onChange={(e) => setCreateForm(p => ({ ...p, email: e.target.value }))} placeholder="Email *" className="w-full px-4 py-3 border rounded-lg text-sm" />
                             <input type="password" value={createForm.password} onChange={(e) => setCreateForm(p => ({ ...p, password: e.target.value }))} placeholder="Password *" className="w-full px-4 py-3 border rounded-lg text-sm" />
-                            <input value={createForm.phone} onChange={(e) => setCreateForm(p => ({ ...p, phone: e.target.value }))} placeholder="Phone" className="w-full px-4 py-3 border rounded-lg text-sm" />
+                            <input value={createForm.phone} onChange={(e) => setCreateForm(p => ({ ...p, phone: e.target.value }))} placeholder="Phone *" className="w-full px-4 py-3 border rounded-lg text-sm" required />
+                            <input type="number" value={createForm.age} onChange={(e) => setCreateForm(p => ({ ...p, age: e.target.value }))} placeholder="Age *" min="18" max="100" className="w-full px-4 py-3 border rounded-lg text-sm" />
+                            <select value={createForm.managerType} onChange={(e) => setCreateForm(p => ({ ...p, managerType: e.target.value }))} className="w-full px-4 py-3 border rounded-lg text-sm bg-white" required>
+                                <option value="">Select Manager Type *</option>
+                                <option value="trainer_manager">Trainer Manager</option>
+                                <option value="lab_manager">Lab Manager</option>
+                            </select>
                             <select value={createForm.assignedRegion} onChange={(e) => setCreateForm(p => ({ ...p, assignedRegion: e.target.value }))} className="w-full px-4 py-3 border rounded-lg text-sm bg-white">
                                 <option value="">Select Region</option>
                                 {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
-                            <input value={createForm.department} onChange={(e) => setCreateForm(p => ({ ...p, department: e.target.value }))} placeholder="Department (optional)" className="w-full px-4 py-3 border rounded-lg text-sm" />
                             {createError && <p className="text-red-500 text-sm">{createError}</p>}
                             <button type="submit" disabled={createLoading} className="w-full py-3 bg-[#3f8554] text-white rounded-lg font-medium hover:bg-[#225533] disabled:opacity-50">
                                 {createLoading ? 'Creating...' : 'Create Manager'}

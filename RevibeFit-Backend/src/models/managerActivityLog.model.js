@@ -6,6 +6,15 @@ const managerActivityLogSchema = new mongoose.Schema({
         ref: "User",
         required: true,
     },
+    managerType: {
+        type: String,
+        enum: ["trainer_manager", "lab_manager"],
+        required: true,
+    },
+    region: {
+        type: String,
+        required: true,
+    },
     action: {
         type: String,
         required: true,
@@ -14,6 +23,8 @@ const managerActivityLogSchema = new mongoose.Schema({
             "REJECT_USER",
             "SUSPEND_USER",
             "UNSUSPEND_USER",
+            "SUSPEND_TRAINER",
+            "UNSUSPEND_TRAINER",
             "CLAIM_APPROVAL",
             "RELEASE_APPROVAL",
             "GENERATE_INVOICE",
@@ -24,6 +35,7 @@ const managerActivityLogSchema = new mongoose.Schema({
             "SUSPEND_LAB_NONPAYMENT",
             "UNSUSPEND_LAB",
             "REQUEST_COMMISSION_CHANGE",
+            "REQUEST_TRAINER_COMMISSION_CHANGE",
             "UPDATE_PROFILE",
         ],
     },
@@ -33,6 +45,10 @@ const managerActivityLogSchema = new mongoose.Schema({
     },
     targetId: {
         type: mongoose.Schema.Types.ObjectId,
+    },
+    targetUserType: {
+        type: String,
+        default: null,
     },
     details: {
         type: mongoose.Schema.Types.Mixed,
@@ -48,13 +64,8 @@ const managerActivityLogSchema = new mongoose.Schema({
     },
 });
 
-// TTL index: auto-delete after 6 months (180 days)
-managerActivityLogSchema.index(
-    { createdAt: 1 },
-    { expireAfterSeconds: 15552000 }
-);
-
 // Query indexes
+managerActivityLogSchema.index({ managerType: 1, region: 1, createdAt: -1 });
 managerActivityLogSchema.index({ managerId: 1, createdAt: -1 });
 managerActivityLogSchema.index({ action: 1, createdAt: -1 });
 

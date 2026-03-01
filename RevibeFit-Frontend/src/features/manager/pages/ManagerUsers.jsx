@@ -75,7 +75,7 @@ const ManagerUsers = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} />
+            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} managerType={manager.managerType} />
             <div className="lg:ml-64 pt-16 lg:pt-0">
                 <div className="p-6 lg:p-8">
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">User Management</h1>
@@ -95,8 +95,8 @@ const ManagerUsers = () => {
                             className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
                             <option value="">All Types</option>
                             <option value="fitness-enthusiast">Fitness Enthusiasts</option>
-                            <option value="trainer">Trainers</option>
-                            <option value="lab-partner">Lab Partners</option>
+                            {(!manager.managerType || manager.managerType === 'trainer_manager') && <option value="trainer">Trainers</option>}
+                            {(!manager.managerType || manager.managerType === 'lab_manager') && <option value="lab-partner">Lab Partners</option>}
                         </select>
                     </div>
 

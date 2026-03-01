@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { STATUS_CODES, USER_TYPES } from "../constants.js";
+import { STATUS_CODES, USER_TYPES, MANAGER_TYPES } from "../constants.js";
 import { User } from "../models/user.model.js";
 import { LabBooking } from "../models/labBooking.model.js";
 import { PlatformInvoice } from "../models/platformInvoice.model.js";
@@ -30,6 +30,16 @@ const getRegion = (req) => {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Manager has no assigned region");
     }
     return region;
+};
+
+/** Get the manager type from req.user */
+const getManagerType = (req) => req.user?.managerType;
+
+/** Get allowed user types based on manager type */
+const getAllowedUserTypes = (managerType) => {
+    if (managerType === MANAGER_TYPES.TRAINER_MANAGER) return [USER_TYPES.TRAINER];
+    if (managerType === MANAGER_TYPES.LAB_MANAGER) return [USER_TYPES.LAB_PARTNER];
+    return [];
 };
 
 const CLAIM_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
@@ -100,9 +110,12 @@ const updateManagerProfile = asyncHandler(async (req, res) => {
 
 const getPendingApprovals = asyncHandler(async (req, res) => {
     const region = getRegion(req);
+    const managerType = getManagerType(req);
+    const allowedTypes = getAllowedUserTypes(managerType);
+
     const pendingUsers = await User.find({
         approvalStatus: "pending",
-        userType: { $in: [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] },
+        userType: { $in: allowedTypes.length ? allowedTypes : [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] },
         state: region,
     }).select("-password -refreshToken");
 
@@ -116,9 +129,16 @@ const getPendingApprovals = asyncHandler(async (req, res) => {
 const claimApproval = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const region = getRegion(req);
+    const managerType = getManagerType(req);
+    const allowedTypes = getAllowedUserTypes(managerType);
 
     const user = await User.findOne({ _id: userId, approvalStatus: "pending", state: region });
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "Pending user not found in your region");
+
+    // Verify manager can handle this user type
+    if (allowedTypes.length && !allowedTypes.includes(user.userType)) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, `${managerType === MANAGER_TYPES.TRAINER_MANAGER ? 'Trainer' : 'Lab'} managers cannot manage ${user.userType} users`);
+    }
 
     // Check existing claim
     if (user.claimedBy && user.claimedAt && (Date.now() - user.claimedAt.getTime() < CLAIM_EXPIRY_MS)) {
@@ -161,10 +181,17 @@ const releaseApproval = asyncHandler(async (req, res) => {
 const approveUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const region = getRegion(req);
+    const managerType = getManagerType(req);
+    const allowedTypes = getAllowedUserTypes(managerType);
 
     const user = await User.findOne({ _id: userId, state: region });
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found in your region");
     if (user.approvalStatus === "approved") throw new ApiError(STATUS_CODES.BAD_REQUEST, "Already approved");
+
+    // Verify manager can handle this user type
+    if (allowedTypes.length && !allowedTypes.includes(user.userType)) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, `You cannot approve ${user.userType} users`);
+    }
 
     // Verify claim
     if (user.claimedBy && user.claimedAt && (Date.now() - user.claimedAt.getTime() < CLAIM_EXPIRY_MS)) {
@@ -196,10 +223,17 @@ const rejectUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { reason } = req.body;
     const region = getRegion(req);
+    const managerType = getManagerType(req);
+    const allowedTypes = getAllowedUserTypes(managerType);
 
     const user = await User.findOne({ _id: userId, state: region });
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found in your region");
     if (user.approvalStatus === "rejected") throw new ApiError(STATUS_CODES.BAD_REQUEST, "Already rejected");
+
+    // Verify manager can handle this user type
+    if (allowedTypes.length && !allowedTypes.includes(user.userType)) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, `You cannot reject ${user.userType} users`);
+    }
 
     user.approvalStatus = "rejected";
     user.isApproved = false;
@@ -222,6 +256,7 @@ const rejectUser = asyncHandler(async (req, res) => {
 
 const getAllUsers = asyncHandler(async (req, res) => {
     const region = getRegion(req);
+    const managerType = getManagerType(req);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -236,7 +271,17 @@ const getAllUsers = asyncHandler(async (req, res) => {
             { email: { $regex: safe, $options: "i" } },
         ];
     }
-    if (userType) filter.userType = userType;
+
+    if (userType) {
+        filter.userType = userType;
+    } else {
+        // Default filter by manager type
+        if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
+            filter.userType = { $in: [USER_TYPES.TRAINER, USER_TYPES.FITNESS_ENTHUSIAST] };
+        } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
+            filter.userType = { $in: [USER_TYPES.LAB_PARTNER, USER_TYPES.FITNESS_ENTHUSIAST] };
+        }
+    }
 
     const users = await User.find(filter).select("-password -refreshToken").sort({ createdAt: -1 }).skip(skip).limit(limit);
     const totalUsers = await User.countDocuments(filter);
@@ -254,6 +299,7 @@ const toggleUserSuspension = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { suspend, reason } = req.body;
     const region = getRegion(req);
+    const managerType = getManagerType(req);
 
     if (typeof suspend !== "boolean") throw new ApiError(STATUS_CODES.BAD_REQUEST, "suspend must be boolean");
 
@@ -263,12 +309,20 @@ const toggleUserSuspension = asyncHandler(async (req, res) => {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Cannot suspend admin or manager accounts");
     }
 
+    // Check manager type scope for non-FE users
+    if (user.userType !== USER_TYPES.FITNESS_ENTHUSIAST) {
+        const allowedTypes = getAllowedUserTypes(managerType);
+        if (allowedTypes.length && !allowedTypes.includes(user.userType)) {
+            throw new ApiError(STATUS_CODES.FORBIDDEN, `You cannot suspend ${user.userType} users`);
+        }
+    }
+
     user.isSuspended = suspend;
     user.suspensionReason = suspend ? (reason || "No reason provided") : null;
     user.suspendedAt = suspend ? new Date() : null;
     await user.save();
 
-    await logManagerActivity(req, suspend ? "SUSPEND_USER" : "UNSUSPEND_USER", "User", userId, { userName: user.name, reason });
+    await logManagerActivity(req, suspend ? "SUSPEND_USER" : "UNSUSPEND_USER", "User", userId, { userName: user.name, reason, userType: user.userType });
 
     return res.status(STATUS_CODES.SUCCESS).json(
         new ApiResponse(STATUS_CODES.SUCCESS, { userId: user._id, isSuspended: user.isSuspended, reason: user.suspensionReason }, `User ${suspend ? "suspended" : "unsuspended"}`)
@@ -277,8 +331,30 @@ const toggleUserSuspension = asyncHandler(async (req, res) => {
 
 const getUserStats = asyncHandler(async (req, res) => {
     const region = getRegion(req);
+    const managerType = getManagerType(req);
     const f = { state: region };
 
+    if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
+        const [tr, fe, pending] = await Promise.all([
+            User.countDocuments({ ...f, userType: USER_TYPES.TRAINER }),
+            User.countDocuments({ ...f, userType: USER_TYPES.FITNESS_ENTHUSIAST }),
+            User.countDocuments({ ...f, approvalStatus: "pending", userType: USER_TYPES.TRAINER }),
+        ]);
+        return res.status(STATUS_CODES.SUCCESS).json(
+            new ApiResponse(STATUS_CODES.SUCCESS, { trainers: tr, fitnessEnthusiasts: fe, pendingApprovals: pending, region }, "Stats fetched")
+        );
+    } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
+        const [lp, fe, pending] = await Promise.all([
+            User.countDocuments({ ...f, userType: USER_TYPES.LAB_PARTNER }),
+            User.countDocuments({ ...f, userType: USER_TYPES.FITNESS_ENTHUSIAST }),
+            User.countDocuments({ ...f, approvalStatus: "pending", userType: USER_TYPES.LAB_PARTNER }),
+        ]);
+        return res.status(STATUS_CODES.SUCCESS).json(
+            new ApiResponse(STATUS_CODES.SUCCESS, { labPartners: lp, fitnessEnthusiasts: fe, pendingApprovals: pending, region }, "Stats fetched")
+        );
+    }
+
+    // Fallback: return all
     const [total, fe, tr, lp, pending] = await Promise.all([
         User.countDocuments(f),
         User.countDocuments({ ...f, userType: USER_TYPES.FITNESS_ENTHUSIAST }),
@@ -295,23 +371,49 @@ const getUserStats = asyncHandler(async (req, res) => {
 const getUserActivity = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const region = getRegion(req);
+    const managerType = getManagerType(req);
 
     const user = await User.findOne({ _id: userId, state: region }).select("-password -refreshToken");
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found in your region");
 
+    // Type-gate: trainers only viewable by trainer managers, lab partners only by lab managers
+    if (user.userType === USER_TYPES.TRAINER && managerType === MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Lab managers cannot view trainer activity");
+    }
+    if (user.userType === USER_TYPES.LAB_PARTNER && managerType === MANAGER_TYPES.TRAINER_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Trainer managers cannot view lab partner activity");
+    }
+
     const activity = { user };
 
     if (user.userType === USER_TYPES.FITNESS_ENTHUSIAST) {
-        const [workouts, classBookings, labBookings, mealLogs, blogReadings, nutritionProfile] = await Promise.all([
-            CompletedWorkout.find({ userId }).sort({ completedAt: -1 }).limit(50),
-            ClassBooking.find({ userId }).populate("classId", "title classType scheduledDate cost").populate("trainerId", "name").sort({ createdAt: -1 }).limit(50),
-            LabBooking.find({ userId }).populate("labPartnerId", "name laboratoryName").sort({ createdAt: -1 }).limit(50),
-            MealLog.find({ userId }).sort({ date: -1 }).limit(30),
-            BlogReading.find({ userId }).populate("blogId", "title category").sort({ readAt: -1 }).limit(30),
-            NutritionProfile.findOne({ userId }),
-        ]);
-        const totalSpent = classBookings.reduce((s, b) => s + (b.amountPaid || 0), 0) + labBookings.reduce((s, b) => s + (b.totalAmount || 0), 0);
-        Object.assign(activity, { workouts, classBookings, labBookings, mealLogs, blogReadings, nutritionProfile, summary: { totalWorkouts: workouts.length, totalClassBookings: classBookings.length, totalLabBookings: labBookings.length, totalMealLogs: mealLogs.length, totalBlogReads: blogReadings.length, totalSpent } });
+        if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
+            // Trainer Manager sees: workouts, classBookings, blogReadings — NO labBookings
+            const [workouts, classBookings, mealLogs, blogReadings, nutritionProfile] = await Promise.all([
+                CompletedWorkout.find({ userId }).sort({ completedAt: -1 }).limit(50),
+                ClassBooking.find({ userId }).populate("classId", "title classType scheduledDate cost").populate("trainerId", "name").sort({ createdAt: -1 }).limit(50),
+                MealLog.find({ userId }).sort({ date: -1 }).limit(30),
+                BlogReading.find({ userId }).populate("blogId", "title category").sort({ readAt: -1 }).limit(30),
+                NutritionProfile.findOne({ userId }),
+            ]);
+            Object.assign(activity, { workouts, classBookings, mealLogs, blogReadings, nutritionProfile, summary: { totalWorkouts: workouts.length, totalClassBookings: classBookings.length, totalMealLogs: mealLogs.length, totalBlogReads: blogReadings.length } });
+        } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
+            // Lab Manager sees: labBookings only
+            const labBookings = await LabBooking.find({ userId }).populate("labPartnerId", "name laboratoryName").sort({ createdAt: -1 }).limit(50);
+            Object.assign(activity, { labBookings, summary: { totalLabBookings: labBookings.length } });
+        } else {
+            // Fallback: show everything
+            const [workouts, classBookings, labBookings, mealLogs, blogReadings, nutritionProfile] = await Promise.all([
+                CompletedWorkout.find({ userId }).sort({ completedAt: -1 }).limit(50),
+                ClassBooking.find({ userId }).populate("classId", "title classType scheduledDate cost").populate("trainerId", "name").sort({ createdAt: -1 }).limit(50),
+                LabBooking.find({ userId }).populate("labPartnerId", "name laboratoryName").sort({ createdAt: -1 }).limit(50),
+                MealLog.find({ userId }).sort({ date: -1 }).limit(30),
+                BlogReading.find({ userId }).populate("blogId", "title category").sort({ readAt: -1 }).limit(30),
+                NutritionProfile.findOne({ userId }),
+            ]);
+            const totalSpent = classBookings.reduce((s, b) => s + (b.amountPaid || 0), 0) + labBookings.reduce((s, b) => s + (b.totalAmount || 0), 0);
+            Object.assign(activity, { workouts, classBookings, labBookings, mealLogs, blogReadings, nutritionProfile, summary: { totalWorkouts: workouts.length, totalClassBookings: classBookings.length, totalLabBookings: labBookings.length, totalMealLogs: mealLogs.length, totalBlogReads: blogReadings.length, totalSpent } });
+        }
     } else if (user.userType === USER_TYPES.TRAINER) {
         const [classes, bookingsReceived, blogs, earningsAgg] = await Promise.all([
             LiveClass.find({ trainerId: userId }).sort({ createdAt: -1 }).limit(50),
@@ -344,6 +446,9 @@ const getUserActivity = asyncHandler(async (req, res) => {
 // ─── Lab Partner Management (region-scoped) ───────────────
 
 const getLabPartnersWithCommissionRates = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access lab partner data");
+    }
     const region = getRegion(req);
     const labPartners = await User.find({
         userType: USER_TYPES.LAB_PARTNER, isApproved: true, approvalStatus: "approved", state: region,
@@ -355,6 +460,9 @@ const getLabPartnersWithCommissionRates = asyncHandler(async (req, res) => {
 });
 
 const suspendLabForNonPayment = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can suspend labs");
+    }
     const { labPartnerId } = req.params;
     const { invoiceIds, notes } = req.body;
     const region = getRegion(req);
@@ -383,6 +491,9 @@ const suspendLabForNonPayment = asyncHandler(async (req, res) => {
 });
 
 const unsuspendLab = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can unsuspend labs");
+    }
     const { labPartnerId } = req.params;
     const region = getRegion(req);
 
@@ -414,10 +525,10 @@ const requestCommissionRateChange = asyncHandler(async (req, res) => {
 
     const target = await User.findOne({
         _id: targetUserId,
-        userType: { $in: [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] },
+        userType: { $in: getAllowedUserTypes(getManagerType(req)).length ? getAllowedUserTypes(getManagerType(req)) : [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] },
         state: region,
     });
-    if (!target) throw new ApiError(STATUS_CODES.NOT_FOUND, "Target user not found in your region");
+    if (!target) throw new ApiError(STATUS_CODES.NOT_FOUND, "Target user not found in your region or outside your scope");
 
     // Check for existing pending request
     const existing = await CommissionChangeRequest.findOne({ targetUserId, status: "pending" });
@@ -460,6 +571,9 @@ const getRegionLabPartnerIds = async (region) => {
 };
 
 const getAllInvoices = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access invoices");
+    }
     const region = getRegion(req);
     const labPartnerIds = await getRegionLabPartnerIds(region);
     const { status, month, year, labPartnerId } = req.query;
@@ -477,6 +591,9 @@ const getAllInvoices = asyncHandler(async (req, res) => {
 });
 
 const getInvoiceById = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access invoices");
+    }
     const { invoiceId } = req.params;
     const region = getRegion(req);
     const labPartnerIds = await getRegionLabPartnerIds(region);
@@ -493,6 +610,9 @@ const getInvoiceById = asyncHandler(async (req, res) => {
 });
 
 const generateMonthlyInvoice = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can generate invoices");
+    }
     const { labPartnerId } = req.params;
     const { month, year, dueDay } = req.body;
     const region = getRegion(req);
@@ -552,6 +672,9 @@ const generateMonthlyInvoice = asyncHandler(async (req, res) => {
 });
 
 const markInvoiceAsPaid = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can mark invoices");
+    }
     const { invoiceId } = req.params;
     const { paymentMethod, paymentReference, paymentNotes } = req.body;
     const region = getRegion(req);
@@ -592,6 +715,9 @@ const markInvoiceAsPaid = asyncHandler(async (req, res) => {
 });
 
 const enforceOverdueInvoices = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can enforce overdue invoices");
+    }
     const region = getRegion(req);
     const labPartnerIds = await getRegionLabPartnerIds(region);
     const now = new Date();
@@ -633,6 +759,9 @@ const enforceOverdueInvoices = asyncHandler(async (req, res) => {
 });
 
 const getInvoiceRequests = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access invoice requests");
+    }
     const region = getRegion(req);
     const labPartners = await User.find({ userType: USER_TYPES.LAB_PARTNER, isApproved: true, approvalStatus: "approved", state: region, unbilledCommissions: { $gt: 0 } })
         .select("name laboratoryName email phone unbilledCommissions currentMonthLiability");
@@ -647,6 +776,9 @@ const getInvoiceRequests = asyncHandler(async (req, res) => {
 });
 
 const getGracePeriodStatus = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access grace period status");
+    }
     const region = getRegion(req);
     const labPartnerIds = await getRegionLabPartnerIds(region);
     const now = new Date();
@@ -678,71 +810,126 @@ const getGracePeriodStatus = asyncHandler(async (req, res) => {
 
 const getDashboardAnalytics = asyncHandler(async (req, res) => {
     const region = getRegion(req);
+    const managerType = getManagerType(req);
     const regionFilter = { state: region };
     const now = new Date();
     const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const sevenDaysAgo = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // User stats (region-scoped)
-    const [totalUsers, fe, tr, lp, pending, activeUsers, suspendedUsers, newThisMonth, newThisWeek] = await Promise.all([
+    if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
+        // Trainer Manager dashboard
+        const [tr, fe, pendingTrainer, activeTrainers, suspendedTrainers, newThisMonth] = await Promise.all([
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.TRAINER }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.FITNESS_ENTHUSIAST }),
+            User.countDocuments({ ...regionFilter, approvalStatus: "pending", userType: USER_TYPES.TRAINER }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.TRAINER, isActive: true, isSuspended: false }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.TRAINER, isSuspended: true }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.TRAINER, createdAt: { $gte: thirtyDaysAgo } }),
+        ]);
+
+        const trainerIds = (await User.find({ ...regionFilter, userType: USER_TYPES.TRAINER }).select("_id")).map((t) => t._id);
+        const [totalClasses, totalClassBookings, classBookingsThisMonth] = await Promise.all([
+            LiveClass.countDocuments({ trainerId: { $in: trainerIds } }),
+            ClassBooking.countDocuments({ trainerId: { $in: trainerIds } }),
+            ClassBooking.countDocuments({ trainerId: { $in: trainerIds }, createdAt: { $gte: thirtyDaysAgo } }),
+        ]);
+
+        // Trainer earnings overview
+        const earningsAgg = await ClassBooking.aggregate([
+            { $match: { trainerId: { $in: trainerIds }, bookingStatus: { $in: ["active", "completed"] }, paymentStatus: "completed" } },
+            { $group: { _id: null, totalRevenue: { $sum: "$amountPaid" }, totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } } } },
+        ]);
+
+        const recentRegistrations = await User.find({ ...regionFilter, userType: { $in: [USER_TYPES.TRAINER, USER_TYPES.FITNESS_ENTHUSIAST] } })
+            .sort({ createdAt: -1 }).limit(10).select("name email userType createdAt isApproved isSuspended");
+
+        return res.status(STATUS_CODES.SUCCESS).json(
+            new ApiResponse(STATUS_CODES.SUCCESS, {
+                region,
+                managerType,
+                overview: { totalTrainers: tr, fitnessEnthusiasts: fe, pendingApprovals: pendingTrainer, activeTrainers, suspendedTrainers, newTrainersThisMonth: newThisMonth },
+                liveClasses: { total: totalClasses, totalBookings: totalClassBookings, bookingsThisMonth: classBookingsThisMonth },
+                trainerEarnings: earningsAgg[0] || { totalRevenue: 0, totalCommission: 0 },
+                recentRegistrations,
+            }, "Dashboard analytics fetched")
+        );
+    } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
+        // Lab Manager dashboard
+        const [lp, fe, pendingLab, activeLabs, suspendedLabs, newThisMonth] = await Promise.all([
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.LAB_PARTNER }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.FITNESS_ENTHUSIAST }),
+            User.countDocuments({ ...regionFilter, approvalStatus: "pending", userType: USER_TYPES.LAB_PARTNER }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.LAB_PARTNER, isActive: true, isSuspended: false }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.LAB_PARTNER, isSuspended: true }),
+            User.countDocuments({ ...regionFilter, userType: USER_TYPES.LAB_PARTNER, createdAt: { $gte: thirtyDaysAgo } }),
+        ]);
+
+        const labPartnerIds = await getRegionLabPartnerIds(region);
+        const [totalLabBookings, labBookingsThisMonth] = await Promise.all([
+            LabBooking.countDocuments({ labPartnerId: { $in: labPartnerIds } }),
+            LabBooking.countDocuments({ labPartnerId: { $in: labPartnerIds }, createdAt: { $gte: thirtyDaysAgo } }),
+        ]);
+
+        const [totalInvoices, paidInvoices, overdueInvoices, pendingInvoices] = await Promise.all([
+            PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds } }),
+            PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds }, status: "paid" }),
+            PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds }, status: "overdue" }),
+            PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds }, status: "payment_due" }),
+        ]);
+
+        // Commission stats
+        const commissionAgg = await LabBooking.aggregate([
+            { $match: { labPartnerId: { $in: labPartnerIds }, paymentReceivedByLab: true } },
+            { $group: { _id: null, totalRevenue: { $sum: "$totalAmount" }, totalCommission: { $sum: { $ifNull: ["$commissionAmount", 0] } } } },
+        ]);
+
+        const recentRegistrations = await User.find({ ...regionFilter, userType: { $in: [USER_TYPES.LAB_PARTNER, USER_TYPES.FITNESS_ENTHUSIAST] } })
+            .sort({ createdAt: -1 }).limit(10).select("name email userType createdAt isApproved isSuspended");
+
+        return res.status(STATUS_CODES.SUCCESS).json(
+            new ApiResponse(STATUS_CODES.SUCCESS, {
+                region,
+                managerType,
+                overview: { totalLabPartners: lp, fitnessEnthusiasts: fe, pendingApprovals: pendingLab, activeLabs, suspendedLabs, newLabsThisMonth: newThisMonth },
+                labs: { totalBookings: totalLabBookings, bookingsThisMonth: labBookingsThisMonth },
+                invoices: { total: totalInvoices, paid: paidInvoices, overdue: overdueInvoices, pending: pendingInvoices },
+                commissionStats: commissionAgg[0] || { totalRevenue: 0, totalCommission: 0 },
+                recentRegistrations,
+            }, "Dashboard analytics fetched")
+        );
+    }
+
+    // Fallback: generic dashboard (shouldn't happen with proper manager types)
+    const [totalUsers, pending] = await Promise.all([
         User.countDocuments(regionFilter),
-        User.countDocuments({ ...regionFilter, userType: USER_TYPES.FITNESS_ENTHUSIAST }),
-        User.countDocuments({ ...regionFilter, userType: USER_TYPES.TRAINER }),
-        User.countDocuments({ ...regionFilter, userType: USER_TYPES.LAB_PARTNER }),
         User.countDocuments({ ...regionFilter, approvalStatus: "pending" }),
-        User.countDocuments({ ...regionFilter, isActive: true, isSuspended: false }),
-        User.countDocuments({ ...regionFilter, isSuspended: true }),
-        User.countDocuments({ ...regionFilter, createdAt: { $gte: thirtyDaysAgo } }),
-        User.countDocuments({ ...regionFilter, createdAt: { $gte: sevenDaysAgo } }),
     ]);
-
-    // Region lab partner IDs for booking queries
-    const labPartnerIds = await getRegionLabPartnerIds(region);
-    const trainerIds = (await User.find({ ...regionFilter, userType: USER_TYPES.TRAINER }).select("_id")).map((t) => t._id);
-
-    // Lab booking stats
-    const [totalLabBookings, labBookingsThisMonth] = await Promise.all([
-        LabBooking.countDocuments({ labPartnerId: { $in: labPartnerIds } }),
-        LabBooking.countDocuments({ labPartnerId: { $in: labPartnerIds }, createdAt: { $gte: thirtyDaysAgo } }),
-    ]);
-
-    // Invoice stats
-    const [totalInvoices, paidInvoices, overdueInvoices, pendingInvoices] = await Promise.all([
-        PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds } }),
-        PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds }, status: "paid" }),
-        PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds }, status: "overdue" }),
-        PlatformInvoice.countDocuments({ labPartnerId: { $in: labPartnerIds }, status: "payment_due" }),
-    ]);
-
-    // Class stats
-    const [totalClasses, totalClassBookings] = await Promise.all([
-        LiveClass.countDocuments({ trainerId: { $in: trainerIds } }),
-        ClassBooking.countDocuments({ trainerId: { $in: trainerIds } }),
-    ]);
-
-    // Recent registrations
-    const recentRegistrations = await User.find(regionFilter).sort({ createdAt: -1 }).limit(10).select("name email userType createdAt isApproved isSuspended");
 
     return res.status(STATUS_CODES.SUCCESS).json(
         new ApiResponse(STATUS_CODES.SUCCESS, {
             region,
-            overview: { totalUsers, activeUsers, suspendedUsers, pendingApprovals: pending, newUsersThisMonth: newThisMonth, newUsersThisWeek: newThisWeek },
-            userBreakdown: { fitnessEnthusiasts: fe, trainers: tr, labPartners: lp },
-            labs: { totalBookings: totalLabBookings, bookingsThisMonth: labBookingsThisMonth },
-            invoices: { total: totalInvoices, paid: paidInvoices, overdue: overdueInvoices, pending: pendingInvoices },
-            liveClasses: { total: totalClasses, totalBookings: totalClassBookings },
-            recentRegistrations,
+            managerType: managerType || "unknown",
+            overview: { totalUsers, pendingApprovals: pending },
         }, "Dashboard analytics fetched")
     );
 });
 
 const getMonthlyGrowth = asyncHandler(async (req, res) => {
     const region = getRegion(req);
+    const managerType = getManagerType(req);
     const now = new Date();
     const twelveMonthsAgo = new Date(); twelveMonthsAgo.setMonth(now.getMonth() - 11); twelveMonthsAgo.setDate(1); twelveMonthsAgo.setHours(0, 0, 0, 0);
 
+    // Scope user types by manager type
+    let matchUserTypes = {};
+    if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
+        matchUserTypes = { userType: { $in: [USER_TYPES.TRAINER, USER_TYPES.FITNESS_ENTHUSIAST] } };
+    } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
+        matchUserTypes = { userType: { $in: [USER_TYPES.LAB_PARTNER, USER_TYPES.FITNESS_ENTHUSIAST] } };
+    }
+
     const data = await User.aggregate([
-        { $match: { createdAt: { $gte: twelveMonthsAgo }, state: region } },
+        { $match: { createdAt: { $gte: twelveMonthsAgo }, state: region, ...matchUserTypes } },
         {
             $group: {
                 _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 },
@@ -761,8 +948,17 @@ const getMonthlyGrowth = asyncHandler(async (req, res) => {
 
 const getUserDistribution = asyncHandler(async (req, res) => {
     const region = getRegion(req);
+    const managerType = getManagerType(req);
+
+    let matchFilter = { state: region };
+    if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
+        matchFilter.userType = { $in: [USER_TYPES.TRAINER, USER_TYPES.FITNESS_ENTHUSIAST] };
+    } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
+        matchFilter.userType = { $in: [USER_TYPES.LAB_PARTNER, USER_TYPES.FITNESS_ENTHUSIAST] };
+    }
+
     const dist = await User.aggregate([
-        { $match: { state: region } },
+        { $match: matchFilter },
         { $group: { _id: "$userType", count: { $sum: 1 } } },
     ]);
     const formatted = dist.map((i) => ({ name: i._id.charAt(0).toUpperCase() + i._id.slice(1).replace("-", " "), value: i.count, type: i._id }));
@@ -770,6 +966,9 @@ const getUserDistribution = asyncHandler(async (req, res) => {
 });
 
 const getLabEarningsOverTime = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access lab earnings");
+    }
     const region = getRegion(req);
     const labPartnerIds = await getRegionLabPartnerIds(region);
     const { period = "12months" } = req.query;
@@ -792,6 +991,9 @@ const getLabEarningsOverTime = asyncHandler(async (req, res) => {
 });
 
 const getTopLabPartners = asyncHandler(async (req, res) => {
+    if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access top lab partners");
+    }
     const region = getRegion(req);
     const labPartnerIds = await getRegionLabPartnerIds(region);
 

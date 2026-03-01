@@ -107,7 +107,7 @@ const ManagerPendingApprovals = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} />
+            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} managerType={manager.managerType} />
             <div className="lg:ml-64 pt-16 lg:pt-0">
                 <div className="p-6 lg:p-8">
                     <div className="flex items-center justify-between mb-8">

@@ -157,6 +157,7 @@ export const verifyManagerOrAdmin = asyncHandler(async (req, res, next) => {
       email: user.email,
       name: user.name,
       userType: "manager",
+      managerType: user.managerType,
       assignedRegion: user.assignedRegion,
     };
     next();
@@ -212,6 +213,7 @@ export const verifyManager = asyncHandler(async (req, res, next) => {
       email: user.email,
       name: user.name,
       userType: "manager",
+      managerType: user.managerType,
       assignedRegion: user.assignedRegion,
     };
     next();
@@ -223,3 +225,26 @@ export const verifyManager = asyncHandler(async (req, res, next) => {
   }
 });
 
+/**
+ * Middleware to verify the manager is a Trainer Manager.
+ * Must be used after verifyManager or verifyManagerOrAdmin.
+ */
+export const verifyTrainerManager = asyncHandler(async (req, res, next) => {
+  if (!req.user || req.user.managerType !== "trainer_manager") {
+    if (req.adminUser) return next();
+    throw new ApiError(403, "Access denied - Trainer Manager privileges required");
+  }
+  next();
+});
+
+/**
+ * Middleware to verify the manager is a Lab Manager.
+ * Must be used after verifyManager or verifyManagerOrAdmin.
+ */
+export const verifyLabManager = asyncHandler(async (req, res, next) => {
+  if (!req.user || req.user.managerType !== "lab_manager") {
+    if (req.adminUser) return next();
+    throw new ApiError(403, "Access denied - Lab Manager privileges required");
+  }
+  next();
+});

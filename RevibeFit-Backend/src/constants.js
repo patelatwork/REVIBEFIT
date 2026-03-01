@@ -10,6 +10,12 @@ export const USER_TYPES = {
   MANAGER: "manager",
 };
 
+// Manager Types
+export const MANAGER_TYPES = {
+  TRAINER_MANAGER: "trainer_manager",
+  LAB_MANAGER: "lab_manager",
+};
+
 // Indian States & Union Territories (for region scoping)
 export const INDIAN_STATES = [
   "Andhra Pradesh",

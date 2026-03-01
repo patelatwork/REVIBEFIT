@@ -27,10 +27,19 @@ const navItems = [
     { id: 'profile', label: 'My Profile', icon: User, path: '/manager/profile' },
 ];
 
-const ManagerSidebar = ({ managerName, assignedRegion }) => {
+const ManagerSidebar = ({ managerName, assignedRegion, managerType }) => {
     const [collapsed, setCollapsed] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Filter nav items based on manager type
+    const filteredNavItems = navItems.filter((item) => {
+        if (managerType === 'trainer_manager') {
+            // Trainer managers don't see Invoices, Earnings
+            return !['invoices', 'earnings'].includes(item.id);
+        }
+        return true;
+    });
 
     const handleLogout = () => {
         localStorage.removeItem('user');
@@ -93,12 +102,24 @@ const ManagerSidebar = ({ managerName, assignedRegion }) => {
                     </div>
                 )}
 
+                {/* Manager Type Badge */}
+                {managerType && (
+                    <div className="px-6 py-2 border-b border-white/10">
+                        <div className={`rounded-lg px-3 py-1.5 text-center ${managerType === 'trainer_manager' ? 'bg-purple-500/10' : 'bg-teal-500/10'}`}>
+                            <p className={`text-[10px] uppercase tracking-wider ${managerType === 'trainer_manager' ? 'text-purple-300/60' : 'text-teal-300/60'}`}>Role</p>
+                            <p className={`text-sm font-medium ${managerType === 'trainer_manager' ? 'text-purple-200' : 'text-teal-200'}`}>
+                                {managerType === 'trainer_manager' ? '🏋️ Trainer Manager' : '🧪 Lab Manager'}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Navigation */}
                 <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                     <p className="text-blue-300/50 text-[10px] font-semibold uppercase tracking-widest px-3 mb-2">
                         Navigation
                     </p>
-                    {navItems.map((item) => {
+                    {filteredNavItems.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item);
                         return (

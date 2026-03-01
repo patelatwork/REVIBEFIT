@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { USER_TYPES, INDIAN_STATES } from "../constants.js";
+import { USER_TYPES, MANAGER_TYPES, INDIAN_STATES } from "../constants.js";
 import config from "../config/index.js";
 
 const userSchema = new mongoose.Schema(
@@ -180,9 +180,17 @@ const userSchema = new mongoose.Schema(
       enum: [...INDIAN_STATES, null],
       default: null,
     },
-    department: {
+    managerType: {
       type: String,
-      trim: true,
+      enum: [MANAGER_TYPES.TRAINER_MANAGER, MANAGER_TYPES.LAB_MANAGER, null],
+      required: function () {
+        return this.userType === USER_TYPES.MANAGER;
+      },
+      default: null,
+    },
+    reportsTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       default: null,
     },
     profilePhoto: {
@@ -246,6 +254,11 @@ const userSchema = new mongoose.Schema(
     },
     approvedBy: {
       type: String, // Admin email who approved
+      default: null,
+    },
+    approvedByRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       default: null,
     },
     approvedAt: {

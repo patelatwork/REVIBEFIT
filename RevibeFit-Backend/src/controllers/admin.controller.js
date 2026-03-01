@@ -2535,10 +2535,13 @@ const getUserActivity = asyncHandler(async (req, res) => {
 // ─── Manager CRUD (Admin-only) ────────────────────────────
 
 const createManager = asyncHandler(async (req, res) => {
-  const { name, email, password, phone, age, assignedRegion, department } = req.body;
+  const { name, email, password, phone, age, assignedRegion, managerType } = req.body;
 
-  if (!name || !email || !password) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Name, email, and password are required");
+  if (!name || !email || !password || !phone || !managerType || !age) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Name, email, password, phone, age, and manager type are required");
+  }
+  if (!["trainer_manager", "lab_manager"].includes(managerType)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Manager type must be 'trainer_manager' or 'lab_manager'");
   }
   if (assignedRegion && !INDIAN_STATES.includes(assignedRegion)) {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid assigned region");
@@ -2552,10 +2555,10 @@ const createManager = asyncHandler(async (req, res) => {
     email,
     password,
     phone: phone || null,
-    age: age || null,
+    age,
     userType: USER_TYPES.MANAGER,
     assignedRegion: assignedRegion || null,
-    department: department || null,
+    managerType,
     createdByAdmin: req.adminUser?.email || "admin",
     isApproved: true,
     approvalStatus: "approved",

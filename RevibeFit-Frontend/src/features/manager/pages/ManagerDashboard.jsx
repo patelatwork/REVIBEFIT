@@ -56,14 +56,17 @@ const ManagerDashboard = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} />
+            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} managerType={manager.managerType} />
 
             <div className="lg:ml-64 pt-16 lg:pt-0">
                 <div className="p-6 lg:p-8">
                     {/* Header */}
                     <div className="mb-8">
                         <h1 className="text-2xl font-bold text-gray-900">Welcome back, {manager.name || 'Manager'}!</h1>
-                        <p className="text-gray-500 mt-1">Region: {manager.assignedRegion || 'Not assigned'}</p>
+                        <p className="text-gray-500 mt-1">
+                            {manager.managerType === 'trainer_manager' ? '🏋️ Trainer Manager' : manager.managerType === 'lab_manager' ? '🧪 Lab Manager' : 'Manager'}
+                            {' • Region: '}{manager.assignedRegion || 'Not assigned'}
+                        </p>
                     </div>
 
                     {loading ? (
@@ -80,50 +83,115 @@ const ManagerDashboard = () => {
                         <>
                             {/* Stats Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                                <StatCard title="Total Users" value={dashboard.overview?.totalUsers || 0} icon={Users} color="bg-blue-500" subtitle={`${dashboard.overview?.newUsersThisMonth || 0} new this month`} />
-                                <StatCard title="Pending Approvals" value={dashboard.overview?.pendingApprovals || 0} icon={ShieldCheck} color="bg-amber-500" subtitle="Requires action" />
-                                <StatCard title="Overdue Invoices" value={dashboard.invoices?.overdue || 0} icon={AlertTriangle} color="bg-red-500" subtitle={`${dashboard.invoices?.pending || 0} pending payment`} />
-                                <StatCard title="Active Users" value={dashboard.overview?.activeUsers || 0} icon={Activity} color="bg-green-500" subtitle={`${dashboard.overview?.suspendedUsers || 0} suspended`} />
+                                {manager.managerType === 'trainer_manager' ? (
+                                    <>
+                                        <StatCard title="Total Trainers" value={dashboard.overview?.totalTrainers || 0} icon={Users} color="bg-purple-500" subtitle={`${dashboard.overview?.newTrainersThisMonth || 0} new this month`} />
+                                        <StatCard title="Fitness Enthusiasts" value={dashboard.overview?.fitnessEnthusiasts || 0} icon={Users} color="bg-blue-500" />
+                                        <StatCard title="Pending Approvals" value={dashboard.overview?.pendingApprovals || 0} icon={ShieldCheck} color="bg-amber-500" subtitle="Requires action" />
+                                        <StatCard title="Active Trainers" value={dashboard.overview?.activeTrainers || 0} icon={Activity} color="bg-green-500" subtitle={`${dashboard.overview?.suspendedTrainers || 0} suspended`} />
+                                    </>
+                                ) : manager.managerType === 'lab_manager' ? (
+                                    <>
+                                        <StatCard title="Lab Partners" value={dashboard.overview?.totalLabPartners || 0} icon={Users} color="bg-teal-500" subtitle={`${dashboard.overview?.newLabsThisMonth || 0} new this month`} />
+                                        <StatCard title="Fitness Enthusiasts" value={dashboard.overview?.fitnessEnthusiasts || 0} icon={Users} color="bg-blue-500" />
+                                        <StatCard title="Pending Approvals" value={dashboard.overview?.pendingApprovals || 0} icon={ShieldCheck} color="bg-amber-500" subtitle="Requires action" />
+                                        <StatCard title="Overdue Invoices" value={dashboard.invoices?.overdue || 0} icon={AlertTriangle} color="bg-red-500" subtitle={`${dashboard.invoices?.pending || 0} pending payment`} />
+                                    </>
+                                ) : (
+                                    <>
+                                        <StatCard title="Total Users" value={dashboard.overview?.totalUsers || 0} icon={Users} color="bg-blue-500" />
+                                        <StatCard title="Pending Approvals" value={dashboard.overview?.pendingApprovals || 0} icon={ShieldCheck} color="bg-amber-500" />
+                                    </>
+                                )}
                             </div>
 
-                            {/* User Breakdown */}
+                            {/* Type-specific Sections */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                                <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">User Breakdown</h3>
-                                    <div className="space-y-4">
-                                        {[
-                                            { label: 'Fitness Enthusiasts', value: dashboard.userBreakdown?.fitnessEnthusiasts || 0, color: 'bg-blue-500' },
-                                            { label: 'Trainers', value: dashboard.userBreakdown?.trainers || 0, color: 'bg-green-500' },
-                                            { label: 'Lab Partners', value: dashboard.userBreakdown?.labPartners || 0, color: 'bg-purple-500' },
-                                        ].map((item) => (
-                                            <div key={item.label} className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                                                    <span className="text-sm text-gray-600">{item.label}</span>
-                                                </div>
-                                                <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                                {manager.managerType === 'trainer_manager' ? (
+                                    <>
+                                        <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Class Stats</h3>
+                                            <div className="space-y-4">
+                                                {[
+                                                    { label: 'Total Classes', value: dashboard.liveClasses?.total || 0 },
+                                                    { label: 'Total Bookings', value: dashboard.liveClasses?.totalBookings || 0 },
+                                                    { label: 'Bookings This Month', value: dashboard.liveClasses?.bookingsThisMonth || 0 },
+                                                ].map((item) => (
+                                                    <div key={item.label} className="flex items-center justify-between">
+                                                        <span className="text-sm text-gray-600">{item.label}</span>
+                                                        <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                </motion.div>
+                                        </motion.div>
 
-                                <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Summary</h3>
-                                    <div className="space-y-4">
-                                        {[
-                                            { label: 'Total Invoices', value: dashboard.invoices?.total || 0 },
-                                            { label: 'Paid', value: dashboard.invoices?.paid || 0 },
-                                            { label: 'Overdue', value: dashboard.invoices?.overdue || 0 },
-                                            { label: 'Pending', value: dashboard.invoices?.pending || 0 },
-                                        ].map((item) => (
-                                            <div key={item.label} className="flex items-center justify-between">
-                                                <span className="text-sm text-gray-600">{item.label}</span>
-                                                <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                                        <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Trainer Earnings</h3>
+                                            <div className="space-y-4">
+                                                {[
+                                                    { label: 'Total Revenue', value: `₹${(dashboard.trainerEarnings?.totalRevenue || 0).toLocaleString()}` },
+                                                    { label: 'Platform Commission', value: `₹${(dashboard.trainerEarnings?.totalCommission || 0).toLocaleString()}` },
+                                                ].map((item) => (
+                                                    <div key={item.label} className="flex items-center justify-between">
+                                                        <span className="text-sm text-gray-600">{item.label}</span>
+                                                        <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                </motion.div>
+                                        </motion.div>
+                                    </>
+                                ) : manager.managerType === 'lab_manager' ? (
+                                    <>
+                                        <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Lab Bookings</h3>
+                                            <div className="space-y-4">
+                                                {[
+                                                    { label: 'Total Bookings', value: dashboard.labs?.totalBookings || 0 },
+                                                    { label: 'Bookings This Month', value: dashboard.labs?.bookingsThisMonth || 0 },
+                                                ].map((item) => (
+                                                    <div key={item.label} className="flex items-center justify-between">
+                                                        <span className="text-sm text-gray-600">{item.label}</span>
+                                                        <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </motion.div>
 
+                                        <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Summary</h3>
+                                            <div className="space-y-4">
+                                                {[
+                                                    { label: 'Total Invoices', value: dashboard.invoices?.total || 0 },
+                                                    { label: 'Paid', value: dashboard.invoices?.paid || 0 },
+                                                    { label: 'Overdue', value: dashboard.invoices?.overdue || 0 },
+                                                    { label: 'Pending', value: dashboard.invoices?.pending || 0 },
+                                                ].map((item) => (
+                                                    <div key={item.label} className="flex items-center justify-between">
+                                                        <span className="text-sm text-gray-600">{item.label}</span>
+                                                        <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+
+                                        <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Commission Stats</h3>
+                                            <div className="space-y-4">
+                                                {[
+                                                    { label: 'Total Revenue', value: `₹${(dashboard.commissionStats?.totalRevenue || 0).toLocaleString()}` },
+                                                    { label: 'Total Commission', value: `₹${(dashboard.commissionStats?.totalCommission || 0).toLocaleString()}` },
+                                                ].map((item) => (
+                                                    <div key={item.label} className="flex items-center justify-between">
+                                                        <span className="text-sm text-gray-600">{item.label}</span>
+                                                        <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    </>
+                                ) : null}
+
+                                {/* Quick Actions (always shown) */}
                                 <motion.div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
                                     <div className="space-y-3">
@@ -133,9 +201,11 @@ const ManagerDashboard = () => {
                                         <button onClick={() => navigate('/manager/users')} className="w-full text-left px-4 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium">
                                             Manage Users →
                                         </button>
-                                        <button onClick={() => navigate('/manager/invoices')} className="w-full text-left px-4 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium">
-                                            Manage Invoices →
-                                        </button>
+                                        {manager.managerType === 'lab_manager' && (
+                                            <button onClick={() => navigate('/manager/invoices')} className="w-full text-left px-4 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium">
+                                                Manage Invoices →
+                                            </button>
+                                        )}
                                     </div>
                                 </motion.div>
                             </div>

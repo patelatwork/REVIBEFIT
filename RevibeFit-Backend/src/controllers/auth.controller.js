@@ -150,7 +150,7 @@ const signup = asyncHandler(async (req, res) => {
   // Determine response message based on user type
   let message = "User registered successfully";
   if (userType === USER_TYPES.TRAINER || userType === USER_TYPES.LAB_PARTNER) {
-    message = "Registration successful! Your account is pending admin approval. You will be able to login once approved.";
+    message = "Registration successful! Your account is pending approval. You will be able to login once approved.";
   }
 
   return res
@@ -243,7 +243,7 @@ const login = asyncHandler(async (req, res) => {
     if (user.approvalStatus === "pending") {
       throw new ApiError(
         STATUS_CODES.FORBIDDEN,
-        "Your account is pending approval. Please wait for admin approval."
+        "Your account is pending approval. Please wait for approval."
       );
     }
     if (user.approvalStatus === "rejected") {

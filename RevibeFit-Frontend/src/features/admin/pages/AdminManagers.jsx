@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserCog, Plus, Trash2, Activity, X } from 'lucide-react';
+import { UserCog, Plus, Trash2, Activity, X, Users } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 
 const API = 'http://localhost:8000/api/admin';
@@ -105,9 +105,12 @@ const AdminManagers = () => {
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Manager Management</h1>
-                            <p className="text-gray-500 mt-1">{managers.length} managers • {commissionRequests.length} pending commission requests</p>
+                            <p className="text-gray-500 mt-1">{managers.filter(m => m.isActive && !m.isSuspended).length} active managers • {commissionRequests.length} pending commission requests</p>
                         </div>
                         <div className="flex gap-3">
+                            <button onClick={() => navigate('/admin/managers/all')} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center gap-2 border border-gray-200">
+                                <Users size={16} /> All Managers
+                            </button>
                             <button onClick={() => setShowCommissions(!showCommissions)} className={`px-4 py-2 rounded-lg text-sm font-medium ${commissionRequests.length > 0 ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
                                 Commission Requests ({commissionRequests.length})
                             </button>

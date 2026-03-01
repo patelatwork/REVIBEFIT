@@ -15,7 +15,7 @@ import { NutritionProfile } from "../models/nutritionProfile.model.js";
 import { LabTest } from "../models/labTest.model.js";
 import { CommissionChangeRequest } from "../models/commissionChangeRequest.model.js";
 import { ManagerActivityLog } from "../models/managerActivityLog.model.js";
-import { sendApprovalEmail, sendRejectionEmail } from "../utils/emailService.js";
+import { sendApprovalEmail, sendRejectionEmail, sendDeactivationEmail } from "../utils/emailService.js";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import config from "../config/index.js";
@@ -2573,7 +2573,8 @@ const createManager = asyncHandler(async (req, res) => {
 });
 
 const getAllManagers = asyncHandler(async (req, res) => {
-  const managers = await User.find({ userType: USER_TYPES.MANAGER })
+  // Only return active, non-hidden managers for the main Manager Management page
+  const managers = await User.find({ userType: USER_TYPES.MANAGER, isHidden: { $ne: true } })
     .select("-password -refreshToken")
     .sort({ createdAt: -1 });
 
@@ -2592,6 +2593,100 @@ const getAllManagers = asyncHandler(async (req, res) => {
   );
 });
 
+const getAllManagersArchive = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
+  const skip = (page - 1) * limit;
+  const search = req.query.search || '';
+  const status = req.query.status || '';
+  const managerType = req.query.managerType || '';
+  const region = req.query.region || '';
+
+  let filter = { userType: USER_TYPES.MANAGER };
+
+  if (search) {
+    const safeSearch = escapeRegex(search);
+    filter.$or = [
+      { name: { $regex: safeSearch, $options: 'i' } },
+      { email: { $regex: safeSearch, $options: 'i' } },
+    ];
+  }
+  if (status === 'active') {
+    filter.isActive = true;
+    filter.isSuspended = { $ne: true };
+  } else if (status === 'inactive') {
+    filter.$or = filter.$or || [];
+    filter.isActive = false;
+  }
+  if (managerType) filter.managerType = managerType;
+  if (region) filter.assignedRegion = region;
+
+  const managers = await User.find(filter)
+    .select("-password -refreshToken")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const totalManagers = await User.countDocuments(filter);
+  const totalPages = Math.ceil(totalManagers / limit);
+
+  // Enrich each manager with activity stats
+  const result = [];
+  for (const mgr of managers) {
+    const totalActions = await ManagerActivityLog.countDocuments({ managerId: mgr._id });
+    const recentActions = await ManagerActivityLog.countDocuments({
+      managerId: mgr._id,
+      createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    });
+    result.push({ ...mgr.toObject(), totalActions, recentActions });
+  }
+
+  // Also return aggregate counts for the archive page header
+  const totalAll = await User.countDocuments({ userType: USER_TYPES.MANAGER });
+  const totalActive = await User.countDocuments({ userType: USER_TYPES.MANAGER, isActive: true, isSuspended: { $ne: true } });
+  const totalInactive = totalAll - totalActive;
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      managers: result,
+      pagination: { currentPage: page, totalPages, totalManagers, hasNextPage: page < totalPages, hasPrevPage: page > 1 },
+      counts: { total: totalAll, active: totalActive, inactive: totalInactive },
+    }, "All managers archive fetched")
+  );
+});
+
+const getManagerDetail = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER })
+    .select("-password -refreshToken");
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  // Get full activity log
+  const logs = await ManagerActivityLog.find({ managerId: id })
+    .sort({ createdAt: -1 })
+    .limit(200);
+  const totalActions = await ManagerActivityLog.countDocuments({ managerId: id });
+  const recentActions = await ManagerActivityLog.countDocuments({
+    managerId: id,
+    createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+  });
+
+  // Calculate active duration
+  const createdAt = manager.createdAt;
+  const deactivatedAt = manager.deactivatedAt || (manager.isActive ? new Date() : manager.suspendedAt);
+  const activeDurationMs = deactivatedAt ? deactivatedAt - createdAt : Date.now() - createdAt;
+  const activeDurationDays = Math.floor(activeDurationMs / (1000 * 60 * 60 * 24));
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      manager: manager.toObject(),
+      activity: { logs, totalActions, recentActions },
+      stats: { activeDurationDays, createdAt, deactivatedAt: manager.deactivatedAt },
+    }, "Manager detail fetched")
+  );
+});
+
 const removeManager = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -2600,12 +2695,68 @@ const removeManager = asyncHandler(async (req, res) => {
 
   manager.isActive = false;
   manager.isSuspended = true;
+  manager.isHidden = true;
+  manager.hiddenAt = new Date();
+  manager.deactivatedAt = new Date();
+  manager.deactivationReason = "Account deactivated by admin";
   manager.suspensionReason = "Account deactivated by admin";
   manager.suspendedAt = new Date();
   await manager.save();
 
+  // Send deactivation email to the manager
+  try {
+    const emailResult = await sendDeactivationEmail(manager);
+    if (!emailResult.success) console.error('Failed to send deactivation email:', emailResult.error);
+  } catch (emailError) {
+    console.error('Error during deactivation email sending process:', emailError);
+  }
+
   return res.status(STATUS_CODES.SUCCESS).json(
-    new ApiResponse(STATUS_CODES.SUCCESS, { managerId: manager._id, name: manager.name }, "Manager removed")
+    new ApiResponse(STATUS_CODES.SUCCESS, { managerId: manager._id, name: manager.name }, "Manager removed and hidden")
+  );
+});
+
+const reactivateManager = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER });
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  if (manager.isActive && !manager.isSuspended) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Manager is already active");
+  }
+
+  manager.isActive = true;
+  manager.isSuspended = false;
+  manager.isHidden = false;
+  manager.hiddenAt = null;
+  manager.deactivatedAt = null;
+  manager.deactivationReason = null;
+  manager.suspensionReason = null;
+  manager.suspendedAt = null;
+  await manager.save();
+
+  const updated = await User.findById(id).select("-password -refreshToken");
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, updated, "Manager reactivated successfully")
+  );
+});
+
+const permanentlyDeleteManager = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER });
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  // Delete all activity logs for this manager
+  await ManagerActivityLog.deleteMany({ managerId: id });
+
+  // Permanently delete the manager
+  await User.findByIdAndDelete(id);
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, { managerId: id, name: manager.name }, "Manager permanently deleted")
   );
 });
 
@@ -2715,7 +2866,11 @@ export {
   getUserActivity,
   createManager,
   getAllManagers,
+  getAllManagersArchive,
+  getManagerDetail,
   removeManager,
+  reactivateManager,
+  permanentlyDeleteManager,
   getManagerActivityLog,
   getPendingCommissionRequests,
   handleCommissionRateRequest,

@@ -215,6 +215,22 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isHidden: {
+      type: Boolean,
+      default: false,
+    },
+    hiddenAt: {
+      type: Date,
+      default: null,
+    },
+    deactivatedAt: {
+      type: Date,
+      default: null,
+    },
+    deactivationReason: {
+      type: String,
+      default: null,
+    },
     suspensionReason: {
       type: String,
       default: null,

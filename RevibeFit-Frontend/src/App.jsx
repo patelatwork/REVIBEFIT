@@ -48,6 +48,7 @@ import ManagerEarnings from './features/manager/pages/ManagerEarnings'
 import ManagerCommissionRequests from './features/manager/pages/ManagerCommissionRequests'
 import ManagerProfile from './features/manager/pages/ManagerProfile'
 import AdminManagers from './features/admin/pages/AdminManagers'
+import ManagerArchive from './features/admin/pages/ManagerArchive'
 import ForgotPassword from './features/auth/ForgotPassword'
 import ResetPassword from './features/auth/ResetPassword'
 
@@ -98,6 +99,7 @@ function App() {
         <Route path="/admin/analytics/lab-earnings" element={<LabEarningsAnalytics />} />
         <Route path="/admin/earnings" element={<LabEarningsAnalytics />} />
         <Route path="/admin/managers" element={<AdminManagers />} />
+        <Route path="/admin/managers/all" element={<ManagerArchive />} />
 
         {/* Manager Routes (no navbar/footer) */}
 

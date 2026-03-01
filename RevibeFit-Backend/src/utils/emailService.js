@@ -364,3 +364,115 @@ export const sendPasswordResetEmail = async (user, resetUrl) => {
     return { success: false, error: error.message };
   }
 };
+
+// Send deactivation email to manager
+export const sendDeactivationEmail = async (user) => {
+  try {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
+      console.log('Email configuration not found, skipping deactivation email');
+      return { success: true, skipped: true, message: 'Email configuration not available' };
+    }
+
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"${config.email.fromName}" <${config.email.from || config.email.user}>`,
+      to: user.email,
+      subject: `RevibeFit - Your Manager Account Has Been Deactivated`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background: #dc3545;
+              color: white;
+              padding: 30px;
+              text-align: center;
+              border-radius: 10px 10px 0 0;
+            }
+            .content {
+              background: #f9f9f9;
+              padding: 30px;
+              border-radius: 0 0 10px 10px;
+            }
+            .info-box {
+              background: white;
+              padding: 15px;
+              border-left: 4px solid #dc3545;
+              margin: 15px 0;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+              color: #666;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Account Deactivated</h1>
+            <p>Your manager account has been deactivated</p>
+          </div>
+          <div class="content">
+            <h2>Dear ${user.name},</h2>
+            <p>We're writing to inform you that your manager account on RevibeFit has been deactivated by an administrator.</p>
+
+            <div class="info-box">
+              <strong>Account Details:</strong>
+              <p><strong>Email:</strong> ${user.email}</p>
+              <p><strong>Account Type:</strong> ${user.managerType === 'trainer_manager' ? 'Trainer Manager' : 'Lab Manager'}</p>
+              <p><strong>Region:</strong> ${user.assignedRegion || 'Not assigned'}</p>
+            </div>
+
+            <p>You will no longer be able to access your manager dashboard or perform any management actions.</p>
+
+            <p>If you believe this was done in error, please contact the RevibeFit administration team for further assistance.</p>
+
+            <p>Best regards,<br><strong>The RevibeFit Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message from RevibeFit. Please do not reply to this email.</p>
+            <p>&copy; ${new Date().getFullYear()} RevibeFit. All rights reserved.</p>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Dear ${user.name},
+
+        We're writing to inform you that your manager account on RevibeFit has been deactivated by an administrator.
+
+        Account Details:
+        - Email: ${user.email}
+        - Account Type: ${user.managerType === 'trainer_manager' ? 'Trainer Manager' : 'Lab Manager'}
+        - Region: ${user.assignedRegion || 'Not assigned'}
+
+        You will no longer be able to access your manager dashboard or perform any management actions.
+
+        If you believe this was done in error, please contact the RevibeFit administration team.
+
+        Best regards,
+        The RevibeFit Team
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Deactivation email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending deactivation email:', error);
+    return { success: false, error: error.message };
+  }
+};

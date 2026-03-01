@@ -34,7 +34,11 @@ import {
   getUserActivity,
   createManager,
   getAllManagers,
+  getAllManagersArchive,
+  getManagerDetail,
   removeManager,
+  reactivateManager,
+  permanentlyDeleteManager,
   getManagerActivityLog,
   getPendingCommissionRequests,
   handleCommissionRateRequest,
@@ -644,7 +648,11 @@ router.get("/invoices/grace-period-status", getGracePeriodStatus);
 
 router.post("/managers", upload.single("profilePhoto"), createManager);
 router.get("/managers", getAllManagers);
+router.get("/managers/archive", getAllManagersArchive);
+router.get("/managers/:id/detail", validateObjectId("id"), getManagerDetail);
 router.delete("/managers/:id", validateObjectId("id"), removeManager);
+router.patch("/managers/:id/reactivate", validateObjectId("id"), reactivateManager);
+router.delete("/managers/:id/permanent", validateObjectId("id"), permanentlyDeleteManager);
 router.get("/managers/:id/activity-log", validateObjectId("id"), getManagerActivityLog);
 
 // ─── Commission Rate Requests ────────────────────────────

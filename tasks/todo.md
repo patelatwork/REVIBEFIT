@@ -53,3 +53,31 @@ Replaced the "View Full Profile" modal pattern with fully expanded inline cards 
 - [x] Social links (Instagram, YouTube, X, Website) shown as colored icon buttons, hidden if empty
 - [x] Action buttons remain in the right column, now with `sticky` positioning
 - [x] Manager API URL now uses `VITE_API_URL` env variable instead of hardcoded localhost
+
+---
+
+# Manager Region Sync on Admin Change
+
+## Summary
+When admin changes a manager's assigned regions, the manager's UI automatically reflects the change on next page load. Trainers, lab partners, and all data shown are scoped to the updated regions without requiring re-login.
+
+## Architecture
+- **Backend**: New `GET /api/manager/me` lightweight endpoint returns fresh `assignedRegions`, `managerType`, `name`, `email`, `profilePhoto`
+- **Backend**: `updateManagerRegions` (admin controller) now auto-releases claimed approval reviews for users in removed regions
+- **Frontend**: New `useManagerProfile()` hook replaces all `localStorage.getItem('user')` reads across manager pages
+- **Hook behavior**: On every page mount, calls `/api/manager/me`, compares regions with cached data, updates localStorage, sets `regionsChanged` flag
+- **Data reload**: When `regionsChanged` is true, all page-level `useEffect` data fetches re-run (dashboard, users, approvals, invoices, earnings, commission requests, profile)
+- **Sidebar**: Region badges update instantly via fresh `manager` object from the hook
+
+## Changes Made
+- [x] **Backend `manager.controller.js`** — Added `getManagerMe` controller (lightweight profile sync endpoint)
+- [x] **Backend `manager.routes.js`** — Added `GET /me` route with `verifyManager` middleware
+- [x] **Backend `admin.controller.js`** — `updateManagerRegions` now detects removed regions and auto-releases claimed reviews (`claimedBy` / `claimedAt` set to null) for pending users in those removed regions
+- [x] **Frontend `hooks/useManagerProfile.js`** — New hook that syncs manager profile with server on every page mount, detects region changes, handles auth redirect
+- [x] **Frontend `ManagerDashboard.jsx`** — Replaced localStorage reads with `useManagerProfile()`, data re-fetches on `regionsChanged`
+- [x] **Frontend `ManagerUsers.jsx`** — Same integration, users list re-fetches on region change
+- [x] **Frontend `ManagerPendingApprovals.jsx`** — Same integration, approvals re-fetch on region change
+- [x] **Frontend `ManagerInvoices.jsx`** — Same integration, invoices re-fetch on region change
+- [x] **Frontend `ManagerEarnings.jsx`** — Same integration, earnings data re-fetches on region change
+- [x] **Frontend `ManagerCommissionRequests.jsx`** — Same integration, commission requests re-fetch on region change
+- [x] **Frontend `ManagerProfile.jsx`** — Same integration, profile data re-fetches on region change

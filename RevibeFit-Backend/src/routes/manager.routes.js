@@ -3,6 +3,7 @@ import { verifyManagerOrAdmin, verifyManager } from "../middlewares/auth.middlew
 import { validateObjectId } from "../middlewares/validate.middleware.js";
 import {
     getManagerProfile,
+    getManagerMe,
     updateManagerProfile,
     getPendingApprovals,
     claimApproval,
@@ -41,6 +42,7 @@ const router = Router();
 
 // ─── Protected Routes ─────────────────────────────────────
 // Profile
+router.get("/me", verifyManager, getManagerMe);
 router.get("/profile", verifyManager, getManagerProfile);
 router.put("/profile", verifyManager, upload.single("profilePhoto"), updateManagerProfile);
 

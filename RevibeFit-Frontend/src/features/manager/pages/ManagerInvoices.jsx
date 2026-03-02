@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, Plus, Filter, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertTriangle, Clock, DollarSign, Building2, Calendar, Search, X } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
+import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
 const API = 'http://localhost:8000/api/manager';
 
@@ -39,15 +40,14 @@ const ManagerInvoices = () => {
     // Confirm actions
     const [confirmAction, setConfirmAction] = useState(null); // { type, invoiceId, data }
 
-    const manager = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = localStorage.getItem('accessToken');
+    const { manager, token, regionsChanged } = useManagerProfile();
 
     useEffect(() => {
-        if (!token) { navigate('/login'); return; }
+        if (!token) return;
         if (manager.managerType !== 'lab_manager') { navigate('/manager/dashboard'); return; }
         fetchInvoices();
         fetchGracePeriod();
-    }, []);
+    }, [regionsChanged]);
 
     const fetchInvoices = async () => {
         try {

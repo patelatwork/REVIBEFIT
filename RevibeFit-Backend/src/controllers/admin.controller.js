@@ -2891,8 +2891,27 @@ const updateManagerRegions = asyncHandler(async (req, res) => {
   const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER });
   if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
 
+  // Determine which regions were removed
+  const previousRegions = manager.assignedRegions || [];
+  const removedRegions = previousRegions.filter(r => !regions.includes(r));
+
   manager.assignedRegions = regions;
   await manager.save();
+
+  // Auto-release any claimed approval reviews for users in removed regions
+  if (removedRegions.length > 0) {
+    const removedStates = getStatesForRegions(removedRegions);
+    if (removedStates.length > 0) {
+      await User.updateMany(
+        {
+          claimedBy: manager._id,
+          approvalStatus: "pending",
+          state: { $in: removedStates },
+        },
+        { $set: { claimedBy: null, claimedAt: null } }
+      );
+    }
+  }
 
   const updated = await User.findById(id).select("-password -refreshToken");
 

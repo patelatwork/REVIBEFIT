@@ -84,6 +84,21 @@ const getManagerProfile = asyncHandler(async (req, res) => {
     );
 });
 
+/** Lightweight sync endpoint – returns only fields needed for sidebar/region sync */
+const getManagerMe = asyncHandler(async (req, res) => {
+    const user = req.user;
+    return res.status(STATUS_CODES.SUCCESS).json(
+        new ApiResponse(STATUS_CODES.SUCCESS, {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            assignedRegions: user.assignedRegions,
+            managerType: user.managerType,
+            profilePhoto: user.profilePhoto,
+        }, "Manager sync data fetched")
+    );
+});
+
 const updateManagerProfile = asyncHandler(async (req, res) => {
     const { name, phone, email } = req.body;
     const user = await User.findById(req.user._id);
@@ -1038,6 +1053,7 @@ const getPlatformRevenue = asyncHandler(async (req, res) => {
 export {
     managerLogin,
     getManagerProfile,
+    getManagerMe,
     updateManagerProfile,
     getPendingApprovals,
     claimApproval,

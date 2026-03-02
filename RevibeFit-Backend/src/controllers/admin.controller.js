@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { STATUS_CODES, USER_TYPES } from "../constants.js";
+import { STATUS_CODES, USER_TYPES, REGION_NAMES, getStatesForRegions } from "../constants.js";
 import { User } from "../models/user.model.js";
 import { LabBooking } from "../models/labBooking.model.js";
 import { PlatformInvoice } from "../models/platformInvoice.model.js";
@@ -13,10 +13,13 @@ import { Blog } from "../models/blog.model.js";
 import { BlogReading } from "../models/blogReading.model.js";
 import { NutritionProfile } from "../models/nutritionProfile.model.js";
 import { LabTest } from "../models/labTest.model.js";
-import { sendApprovalEmail, sendRejectionEmail } from "../utils/emailService.js";
+import { CommissionChangeRequest } from "../models/commissionChangeRequest.model.js";
+import { ManagerActivityLog } from "../models/managerActivityLog.model.js";
+import { sendApprovalEmail, sendRejectionEmail, sendDeactivationEmail, sendRequestMoreInfoEmail } from "../utils/emailService.js";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import config from "../config/index.js";
+import bcrypt from "bcryptjs";
 import { escapeRegex } from "../middlewares/validate.middleware.js";
 
 /**
@@ -75,22 +78,80 @@ const adminLogin = asyncHandler(async (req, res) => {
     );
 });
 
-// @desc    Get pending approval requests
+// @desc    Get approval requests (with filtering, search, sort, pagination)
 // @route   GET /api/admin/pending-approvals
+// @query   type=trainer|lab-partner  status=pending|approved|rejected  search=...  sort=newest|oldest|name  page=1  limit=10
 // @access  Admin
 const getPendingApprovals = asyncHandler(async (req, res) => {
-  const pendingUsers = await User.find({
-    approvalStatus: "pending",
-    userType: { $in: [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] }
-  }).select("-password -refreshToken");
+  const {
+    type,          // 'trainer' | 'lab-partner' (optional — defaults to both)
+    status,        // 'pending' | 'approved' | 'rejected' (optional — defaults to 'pending')
+    search,        // search by name / email / phone
+    sort = "newest", // 'newest' | 'oldest' | 'name'
+    page = 1,
+    limit = 10,
+  } = req.query;
+
+  // Build base filter
+  const filter = {};
+
+  // User type filter
+  if (type === "trainer") {
+    filter.userType = USER_TYPES.TRAINER;
+  } else if (type === "lab-partner") {
+    filter.userType = USER_TYPES.LAB_PARTNER;
+  } else {
+    filter.userType = { $in: [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] };
+  }
+
+  // Status filter (default: pending)
+  const validStatuses = ["pending", "approved", "rejected"];
+  filter.approvalStatus = validStatuses.includes(status) ? status : "pending";
+
+  // Search filter — name, email, or phone
+  if (search && search.trim()) {
+    const escaped = escapeRegex(search.trim());
+    filter.$or = [
+      { name: { $regex: escaped, $options: "i" } },
+      { email: { $regex: escaped, $options: "i" } },
+      { phone: { $regex: escaped, $options: "i" } },
+    ];
+  }
+
+  // Sort
+  let sortOption = { createdAt: -1 }; // newest
+  if (sort === "oldest") sortOption = { createdAt: 1 };
+  else if (sort === "name") sortOption = { name: 1 };
+
+  // Pagination
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const perPage = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+  const skip = (pageNum - 1) * perPage;
+
+  const [users, total] = await Promise.all([
+    User.find(filter)
+      .select("-password -refreshToken")
+      .sort(sortOption)
+      .skip(skip)
+      .limit(perPage),
+    User.countDocuments(filter),
+  ]);
 
   return res
     .status(STATUS_CODES.SUCCESS)
     .json(
       new ApiResponse(
         STATUS_CODES.SUCCESS,
-        pendingUsers,
-        "Pending approvals fetched successfully"
+        {
+          users,
+          pagination: {
+            page: pageNum,
+            limit: perPage,
+            total,
+            totalPages: Math.ceil(total / perPage),
+          },
+        },
+        "Approvals fetched successfully"
       )
     );
 });
@@ -186,6 +247,47 @@ const rejectUser = asyncHandler(async (req, res) => {
         STATUS_CODES.SUCCESS,
         user,
         "User rejected successfully"
+      )
+    );
+});
+
+// @desc    Request more info from a pending trainer / lab partner (sends email)
+// @route   POST /api/admin/request-info/:userId
+// @access  Admin
+const requestMoreInfo = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { message } = req.body;
+
+  if (!message || !message.trim()) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Message is required");
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found");
+  }
+
+  if (user.userType !== USER_TYPES.TRAINER && user.userType !== USER_TYPES.LAB_PARTNER) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Can only request info from trainers or lab partners");
+  }
+
+  try {
+    const emailResult = await sendRequestMoreInfoEmail(user, message);
+    if (!emailResult.success) {
+      console.error('Failed to send request-more-info email:', emailResult.error);
+    }
+  } catch (emailError) {
+    console.error('Error during request-more-info email sending process:', emailError);
+  }
+
+  return res
+    .status(STATUS_CODES.SUCCESS)
+    .json(
+      new ApiResponse(
+        STATUS_CODES.SUCCESS,
+        { userId: user._id, email: user.email },
+        "Request for more information sent successfully"
       )
     );
 });
@@ -2529,11 +2631,353 @@ const getUserActivity = asyncHandler(async (req, res) => {
   );
 });
 
+// ─── Manager CRUD (Admin-only) ────────────────────────────
+
+const createManager = asyncHandler(async (req, res) => {
+  const { name, email, password, phone, age, assignedRegions, managerType } = req.body;
+
+  if (!name || !email || !password || !phone || !managerType || !age) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Name, email, password, phone, age, and manager type are required");
+  }
+  if (!["trainer_manager", "lab_manager"].includes(managerType)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Manager type must be 'trainer_manager' or 'lab_manager'");
+  }
+
+  // Validate assignedRegions - must be a non-empty array of valid region names
+  const regions = Array.isArray(assignedRegions) ? assignedRegions : (assignedRegions ? [assignedRegions] : []);
+  if (regions.length === 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "At least one region must be assigned");
+  }
+  const invalidRegions = regions.filter(r => !REGION_NAMES.includes(r));
+  if (invalidRegions.length > 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Invalid region(s): ${invalidRegions.join(', ')}`);
+  }
+
+  const existing = await User.findOne({ email });
+  if (existing) throw new ApiError(STATUS_CODES.CONFLICT, "Email already registered");
+
+  const manager = await User.create({
+    name,
+    email,
+    password,
+    phone: phone || null,
+    age,
+    userType: USER_TYPES.MANAGER,
+    assignedRegions: regions,
+    managerType,
+    createdByAdmin: req.adminUser?.email || "admin",
+    isApproved: true,
+    approvalStatus: "approved",
+    profilePhoto: req.file ? `temp/${req.file.filename}` : null,
+  });
+
+  const created = await User.findById(manager._id).select("-password -refreshToken");
+
+  return res.status(STATUS_CODES.CREATED).json(
+    new ApiResponse(STATUS_CODES.CREATED, created, "Manager created successfully")
+  );
+});
+
+const getAllManagers = asyncHandler(async (req, res) => {
+  // Only return active, non-hidden managers for the main Manager Management page
+  const managers = await User.find({ userType: USER_TYPES.MANAGER, isHidden: { $ne: true } })
+    .select("-password -refreshToken")
+    .sort({ createdAt: -1 });
+
+  // Attach recent activity count for each manager
+  const result = [];
+  for (const mgr of managers) {
+    const recentActions = await ManagerActivityLog.countDocuments({
+      managerId: mgr._id,
+      createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    });
+    result.push({ ...mgr.toObject(), recentActions });
+  }
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, result, "Managers fetched")
+  );
+});
+
+const getAllManagersArchive = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
+  const skip = (page - 1) * limit;
+  const search = req.query.search || '';
+  const status = req.query.status || '';
+  const managerType = req.query.managerType || '';
+  const region = req.query.region || '';
+
+  let filter = { userType: USER_TYPES.MANAGER };
+
+  if (search) {
+    const safeSearch = escapeRegex(search);
+    filter.$or = [
+      { name: { $regex: safeSearch, $options: 'i' } },
+      { email: { $regex: safeSearch, $options: 'i' } },
+    ];
+  }
+  if (status === 'active') {
+    filter.isActive = true;
+    filter.isSuspended = { $ne: true };
+  } else if (status === 'inactive') {
+    filter.$or = filter.$or || [];
+    filter.isActive = false;
+  }
+  if (managerType) filter.managerType = managerType;
+  if (region) {
+    // region can be a comma-separated string of region names
+    const regions = region.split(',').map(r => r.trim()).filter(Boolean);
+    if (regions.length === 1) {
+      filter.assignedRegions = regions[0];
+    } else if (regions.length > 1) {
+      filter.assignedRegions = { $in: regions };
+    }
+  }
+
+  const managers = await User.find(filter)
+    .select("-password -refreshToken")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const totalManagers = await User.countDocuments(filter);
+  const totalPages = Math.ceil(totalManagers / limit);
+
+  // Enrich each manager with activity stats
+  const result = [];
+  for (const mgr of managers) {
+    const totalActions = await ManagerActivityLog.countDocuments({ managerId: mgr._id });
+    const recentActions = await ManagerActivityLog.countDocuments({
+      managerId: mgr._id,
+      createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    });
+    result.push({ ...mgr.toObject(), totalActions, recentActions });
+  }
+
+  // Also return aggregate counts for the archive page header
+  const totalAll = await User.countDocuments({ userType: USER_TYPES.MANAGER });
+  const totalActive = await User.countDocuments({ userType: USER_TYPES.MANAGER, isActive: true, isSuspended: { $ne: true } });
+  const totalInactive = totalAll - totalActive;
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      managers: result,
+      pagination: { currentPage: page, totalPages, totalManagers, hasNextPage: page < totalPages, hasPrevPage: page > 1 },
+      counts: { total: totalAll, active: totalActive, inactive: totalInactive },
+    }, "All managers archive fetched")
+  );
+});
+
+const getManagerDetail = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER })
+    .select("-password -refreshToken");
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  // Get full activity log
+  const logs = await ManagerActivityLog.find({ managerId: id })
+    .sort({ createdAt: -1 })
+    .limit(200);
+  const totalActions = await ManagerActivityLog.countDocuments({ managerId: id });
+  const recentActions = await ManagerActivityLog.countDocuments({
+    managerId: id,
+    createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+  });
+
+  // Calculate active duration
+  const createdAt = manager.createdAt;
+  const deactivatedAt = manager.deactivatedAt || (manager.isActive ? new Date() : manager.suspendedAt);
+  const activeDurationMs = deactivatedAt ? deactivatedAt - createdAt : Date.now() - createdAt;
+  const activeDurationDays = Math.floor(activeDurationMs / (1000 * 60 * 60 * 24));
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      manager: manager.toObject(),
+      activity: { logs, totalActions, recentActions },
+      stats: { activeDurationDays, createdAt, deactivatedAt: manager.deactivatedAt },
+    }, "Manager detail fetched")
+  );
+});
+
+const removeManager = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER });
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  manager.isActive = false;
+  manager.isSuspended = true;
+  manager.isHidden = true;
+  manager.hiddenAt = new Date();
+  manager.deactivatedAt = new Date();
+  manager.deactivationReason = "Account deactivated by admin";
+  manager.suspensionReason = "Account deactivated by admin";
+  manager.suspendedAt = new Date();
+  await manager.save();
+
+  // Send deactivation email to the manager
+  try {
+    const emailResult = await sendDeactivationEmail(manager);
+    if (!emailResult.success) console.error('Failed to send deactivation email:', emailResult.error);
+  } catch (emailError) {
+    console.error('Error during deactivation email sending process:', emailError);
+  }
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, { managerId: manager._id, name: manager.name }, "Manager removed and hidden")
+  );
+});
+
+const reactivateManager = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER });
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  if (manager.isActive && !manager.isSuspended) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Manager is already active");
+  }
+
+  manager.isActive = true;
+  manager.isSuspended = false;
+  manager.isHidden = false;
+  manager.hiddenAt = null;
+  manager.deactivatedAt = null;
+  manager.deactivationReason = null;
+  manager.suspensionReason = null;
+  manager.suspendedAt = null;
+  await manager.save();
+
+  const updated = await User.findById(id).select("-password -refreshToken");
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, updated, "Manager reactivated successfully")
+  );
+});
+
+const permanentlyDeleteManager = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER });
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  // Delete all activity logs for this manager
+  await ManagerActivityLog.deleteMany({ managerId: id });
+
+  // Permanently delete the manager
+  await User.findByIdAndDelete(id);
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, { managerId: id, name: manager.name }, "Manager permanently deleted")
+  );
+});
+
+const updateManagerRegions = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { assignedRegions } = req.body;
+
+  // Validate
+  const regions = Array.isArray(assignedRegions) ? assignedRegions : [];
+  if (regions.length === 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, "At least one region must be assigned");
+  }
+  const invalidRegions = regions.filter(r => !REGION_NAMES.includes(r));
+  if (invalidRegions.length > 0) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Invalid region(s): ${invalidRegions.join(', ')}`);
+  }
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER });
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  manager.assignedRegions = regions;
+  await manager.save();
+
+  const updated = await User.findById(id).select("-password -refreshToken");
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, updated, "Manager regions updated successfully")
+  );
+});
+
+const getManagerActivityLog = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
+  const skip = (page - 1) * limit;
+
+  const manager = await User.findOne({ _id: id, userType: USER_TYPES.MANAGER }).select("name email assignedRegions");
+  if (!manager) throw new ApiError(STATUS_CODES.NOT_FOUND, "Manager not found");
+
+  const logs = await ManagerActivityLog.find({ managerId: id })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+  const total = await ManagerActivityLog.countDocuments({ managerId: id });
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      manager,
+      logs,
+      pagination: { currentPage: page, totalPages: Math.ceil(total / limit), totalLogs: total },
+    }, "Activity log fetched")
+  );
+});
+
+const getPendingCommissionRequests = asyncHandler(async (req, res) => {
+  const requests = await CommissionChangeRequest.find({ status: "pending" })
+    .populate("requestedBy", "name email assignedRegions")
+    .populate("targetUserId", "name email userType laboratoryName")
+    .sort({ createdAt: -1 });
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, requests, "Pending commission requests fetched")
+  );
+});
+
+const handleCommissionRateRequest = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { action, adminResponse } = req.body;
+
+  if (!action || !["approved", "denied"].includes(action)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, 'action must be "approved" or "denied"');
+  }
+
+  const request = await CommissionChangeRequest.findById(id);
+  if (!request) throw new ApiError(STATUS_CODES.NOT_FOUND, "Request not found");
+  if (request.status !== "pending") throw new ApiError(STATUS_CODES.BAD_REQUEST, "Request already processed");
+
+  request.status = action;
+  request.adminResponse = adminResponse || null;
+  request.respondedAt = new Date();
+  request.respondedBy = req.adminUser?.email || "admin";
+  await request.save();
+
+  // If approved, update the actual commission rate
+  if (action === "approved") {
+    const target = await User.findById(request.targetUserId);
+    if (target) {
+      target.commissionRate = request.proposedRate;
+      await target.save();
+    }
+  }
+
+  const populated = await CommissionChangeRequest.findById(id)
+    .populate("requestedBy", "name email")
+    .populate("targetUserId", "name email userType laboratoryName commissionRate");
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, populated, `Commission rate change ${action}`)
+  );
+});
+
 export {
   adminLogin,
   getPendingApprovals,
   approveUser,
   rejectUser,
+  requestMoreInfo,
   getUserStats,
   getMonthlyGrowth,
   getUserDistribution,
@@ -2562,4 +3006,15 @@ export {
   getTrainerEarningsBreakdown,
   getPlatformRevenue,
   getUserActivity,
+  createManager,
+  getAllManagers,
+  getAllManagersArchive,
+  getManagerDetail,
+  removeManager,
+  reactivateManager,
+  permanentlyDeleteManager,
+  updateManagerRegions,
+  getManagerActivityLog,
+  getPendingCommissionRequests,
+  handleCommissionRateRequest,
 };

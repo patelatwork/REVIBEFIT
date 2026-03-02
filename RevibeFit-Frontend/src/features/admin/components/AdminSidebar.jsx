@@ -12,6 +12,7 @@ import {
   X,
   Dumbbell,
   ChevronRight,
+  UserCog,
 } from 'lucide-react';
 import logo from '../../../assets/exercise_8407005.png';
 
@@ -22,6 +23,7 @@ const navItems = [
   { id: 'approvals', label: 'Approvals', path: '/admin/pending-approvals', icon: ShieldCheck },
   { id: 'invoices', label: 'Invoices', path: '/admin/invoices', icon: FileText },
   { id: 'earnings', label: 'Earnings', path: '/admin/earnings', icon: FlaskConical },
+  { id: 'managers', label: 'Managers', path: '/admin/managers', icon: UserCog },
 ];
 
 const AdminSidebar = ({ activeSection, onSectionChange }) => {
@@ -30,9 +32,9 @@ const AdminSidebar = ({ activeSection, onSectionChange }) => {
   const location = useLocation();
 
   const handleLogout = () => {
-    localStorage.removeItem('admin');
-    localStorage.removeItem('adminToken');
-    window.location.href = '/admin/login';
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    window.location.href = '/login';
   };
 
   const handleItemClick = (item) => {

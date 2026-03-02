@@ -32,7 +32,7 @@ const Analytics = () => {
     try {
       setLoading(true);
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('accessToken');
       const authHeaders = { Authorization: `Bearer ${token}` };
 
       // Fetch monthly growth data
@@ -81,18 +81,18 @@ const Analytics = () => {
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     if (percent < 0.05) return null; // Don't show labels for slices less than 5%
-    
+
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
     return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="white" 
-        textAnchor={x > cx ? 'start' : 'end'} 
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
         fontSize="12"
         fontWeight="bold"
@@ -124,21 +124,19 @@ const Analytics = () => {
         <div className="flex space-x-4 border-b border-gray-200">
           <button
             onClick={() => setActiveChart('growth')}
-            className={`pb-2 px-1 border-b-2 font-medium text-sm ${
-              activeChart === 'growth'
+            className={`pb-2 px-1 border-b-2 font-medium text-sm ${activeChart === 'growth'
                 ? 'border-[#3f8554] text-[#3f8554]'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             Monthly Growth
           </button>
           <button
             onClick={() => setActiveChart('distribution')}
-            className={`pb-2 px-1 border-b-2 font-medium text-sm ${
-              activeChart === 'distribution'
+            className={`pb-2 px-1 border-b-2 font-medium text-sm ${activeChart === 'distribution'
                 ? 'border-[#3f8554] text-[#3f8554]'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             User Distribution
           </button>
@@ -155,8 +153,8 @@ const Analytics = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={monthlyGrowthData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="month" 
+                  <XAxis
+                    dataKey="month"
                     tickFormatter={formatMonth}
                     angle={-45}
                     textAnchor="end"
@@ -175,8 +173,8 @@ const Analytics = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={monthlyGrowthData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="month" 
+                  <XAxis
+                    dataKey="month"
                     tickFormatter={formatMonth}
                     angle={-45}
                     textAnchor="end"
@@ -227,7 +225,7 @@ const Analytics = () => {
                 {userDistributionData.map((item, index) => (
                   <div key={item.type} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center">
-                      <div 
+                      <div
                         className="w-4 h-4 rounded-full mr-3"
                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
                       ></div>
@@ -255,7 +253,7 @@ const Analytics = () => {
             {userDistributionData.reduce((sum, item) => sum + item.value, 0)}
           </div>
         </div>
-        
+
         {userDistributionData.map((item, index) => (
           <div key={item.type} className="bg-green-50 rounded-lg p-4 border-l-4 border-green-400">
             <div className="text-green-600 text-sm font-medium">{item.name}</div>

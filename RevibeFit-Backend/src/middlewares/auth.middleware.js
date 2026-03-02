@@ -100,3 +100,151 @@ export const verifyUserType = (...allowedTypes) => {
     next();
   };
 };
+
+/**
+ * Middleware that allows access for EITHER admin (env-based) OR manager (DB-based).
+ * - Admin: JWT contains { isAdmin: true, userType: "admin" } → sets req.adminUser
+ * - Manager: JWT contains { _id } → looks up User document → sets req.user + req.managerUser
+ */
+export const verifyManagerOrAdmin = asyncHandler(async (req, res, next) => {
+  try {
+    const token =
+      req.cookies?.accessToken ||
+      req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      throw new ApiError(401, "Unauthorized - No token provided");
+    }
+
+    const decoded = jwt.verify(token, config.jwtSecret);
+
+    // Path 1: Admin (env-based credentials)
+    if (decoded.isAdmin && decoded.userType === "admin") {
+      req.adminUser = {
+        email: decoded.email,
+        userType: decoded.userType,
+        isAdmin: true,
+      };
+      return next();
+    }
+
+    // Path 2: Manager (DB-based user)
+    const user = await User.findById(decoded._id).select(
+      "-password -refreshToken"
+    );
+
+    if (!user) {
+      throw new ApiError(401, "Invalid access token");
+    }
+
+    if (user.userType !== "manager") {
+      throw new ApiError(403, "Access denied - Manager or Admin privileges required");
+    }
+
+    if (!user.isActive) {
+      throw new ApiError(403, "Your account has been deactivated");
+    }
+
+    if (user.isSuspended) {
+      throw new ApiError(
+        403,
+        `Your account has been suspended. Reason: ${user.suspensionReason}`
+      );
+    }
+
+    req.user = user;
+    req.managerUser = {
+      email: user.email,
+      name: user.name,
+      userType: "manager",
+      managerType: user.managerType,
+      assignedRegions: user.assignedRegions,
+    };
+    next();
+  } catch (error) {
+    throw new ApiError(
+      401,
+      error?.message || "Invalid access token"
+    );
+  }
+});
+
+/**
+ * Middleware to verify manager JWT tokens (manager-only routes).
+ * Must be a DB-based user with userType "manager".
+ */
+export const verifyManager = asyncHandler(async (req, res, next) => {
+  try {
+    const token =
+      req.cookies?.accessToken ||
+      req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      throw new ApiError(401, "Unauthorized - No token provided");
+    }
+
+    const decoded = jwt.verify(token, config.jwtSecret);
+
+    const user = await User.findById(decoded._id).select(
+      "-password -refreshToken"
+    );
+
+    if (!user) {
+      throw new ApiError(401, "Invalid access token");
+    }
+
+    if (user.userType !== "manager") {
+      throw new ApiError(403, "Access denied - Manager privileges required");
+    }
+
+    if (!user.isActive) {
+      throw new ApiError(403, "Your account has been deactivated");
+    }
+
+    if (user.isSuspended) {
+      throw new ApiError(
+        403,
+        `Your account has been suspended. Reason: ${user.suspensionReason}`
+      );
+    }
+
+    req.user = user;
+    req.managerUser = {
+      email: user.email,
+      name: user.name,
+      userType: "manager",
+      managerType: user.managerType,
+      assignedRegions: user.assignedRegions,
+    };
+    next();
+  } catch (error) {
+    throw new ApiError(
+      401,
+      error?.message || "Invalid access token"
+    );
+  }
+});
+
+/**
+ * Middleware to verify the manager is a Trainer Manager.
+ * Must be used after verifyManager or verifyManagerOrAdmin.
+ */
+export const verifyTrainerManager = asyncHandler(async (req, res, next) => {
+  if (!req.user || req.user.managerType !== "trainer_manager") {
+    if (req.adminUser) return next();
+    throw new ApiError(403, "Access denied - Trainer Manager privileges required");
+  }
+  next();
+});
+
+/**
+ * Middleware to verify the manager is a Lab Manager.
+ * Must be used after verifyManager or verifyManagerOrAdmin.
+ */
+export const verifyLabManager = asyncHandler(async (req, res, next) => {
+  if (!req.user || req.user.managerType !== "lab_manager") {
+    if (req.adminUser) return next();
+    throw new ApiError(403, "Access denied - Lab Manager privileges required");
+  }
+  next();
+});

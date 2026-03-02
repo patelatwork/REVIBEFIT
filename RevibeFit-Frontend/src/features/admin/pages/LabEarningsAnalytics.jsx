@@ -30,7 +30,7 @@ const EarningsPage = () => {
   const [trainerBreakdown, setTrainerBreakdown] = useState([]);
 
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  const authHeaders = { Authorization: `Bearer ${localStorage.getItem('adminToken')}` };
+  const authHeaders = { Authorization: `Bearer ${localStorage.getItem('accessToken')}` };
 
   useEffect(() => {
     fetchAllData();
@@ -69,12 +69,12 @@ const EarningsPage = () => {
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color = 'green', trend }) => {
     const colorMap = {
-      green:  { bg: 'bg-emerald-50', iconBg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-100' },
-      blue:   { bg: 'bg-blue-50',    iconBg: 'bg-blue-100',    text: 'text-blue-600',    border: 'border-blue-100' },
-      purple: { bg: 'bg-purple-50',  iconBg: 'bg-purple-100',  text: 'text-purple-600',  border: 'border-purple-100' },
-      amber:  { bg: 'bg-amber-50',   iconBg: 'bg-amber-100',   text: 'text-amber-600',   border: 'border-amber-100' },
-      red:    { bg: 'bg-red-50',     iconBg: 'bg-red-100',     text: 'text-red-600',     border: 'border-red-100' },
-      teal:   { bg: 'bg-teal-50',    iconBg: 'bg-teal-100',    text: 'text-teal-600',    border: 'border-teal-100' },
+      green: { bg: 'bg-emerald-50', iconBg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-100' },
+      blue: { bg: 'bg-blue-50', iconBg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-100' },
+      purple: { bg: 'bg-purple-50', iconBg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-100' },
+      amber: { bg: 'bg-amber-50', iconBg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-100' },
+      red: { bg: 'bg-red-50', iconBg: 'bg-red-100', text: 'text-red-600', border: 'border-red-100' },
+      teal: { bg: 'bg-teal-50', iconBg: 'bg-teal-100', text: 'text-teal-600', border: 'border-teal-100' },
     };
     const c = colorMap[color] || colorMap.green;
     return (
@@ -380,7 +380,7 @@ const EarningsPage = () => {
 
   return (
     <div className="min-h-screen bg-[#f8faf9]">
-      <AdminSidebar activeSection="earnings" onSectionChange={() => {}} />
+      <AdminSidebar activeSection="earnings" onSectionChange={() => { }} />
 
       <div className="lg:ml-64 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20 lg:pt-8">
@@ -397,9 +397,8 @@ const EarningsPage = () => {
               <div className="flex bg-white rounded-lg border border-gray-200 p-1">
                 {['30days', '12months', 'all'].map((f) => (
                   <button key={f} onClick={() => setTimeFilter(f)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      timeFilter === f ? 'bg-[#225533] text-white' : 'text-gray-600 hover:bg-gray-100'
-                    }`}>
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${timeFilter === f ? 'bg-[#225533] text-white' : 'text-gray-600 hover:bg-gray-100'
+                      }`}>
                     {f === '30days' ? '30 Days' : f === '12months' ? '12 Months' : 'All Time'}
                   </button>
                 ))}
@@ -411,11 +410,10 @@ const EarningsPage = () => {
           <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-200 mb-6 w-fit">
             {tabs.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  activeTab === tab.id
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id
                     ? 'bg-[#225533] text-white shadow-sm'
                     : 'text-gray-600 hover:bg-gray-100'
-                }`}>
+                  }`}>
                 {tab.label}
               </button>
             ))}

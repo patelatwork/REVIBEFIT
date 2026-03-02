@@ -93,10 +93,10 @@ export const sendApprovalEmail = async (user) => {
               <strong>What's Next?</strong>
               <ul>
                 <li>Log in to your account using your credentials</li>
-                ${user.userType === 'trainer' ? 
-                  '<li>Start creating live fitness classes</li><li>Connect with fitness enthusiasts</li><li>Track your earnings and class schedules</li>' : 
-                  '<li>Add your lab tests and services</li><li>Manage bookings and appointments</li><li>Track your revenue and commissions</li>'
-                }
+                ${user.userType === 'trainer' ?
+          '<li>Start creating live fitness classes</li><li>Connect with fitness enthusiasts</li><li>Track your earnings and class schedules</li>' :
+          '<li>Add your lab tests and services</li><li>Manage bookings and appointments</li><li>Track your revenue and commissions</li>'
+        }
               </ul>
             </div>
 
@@ -239,6 +239,283 @@ export const sendRejectionEmail = async (user, reason) => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending rejection email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send password reset email
+export const sendPasswordResetEmail = async (user, resetUrl) => {
+  try {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
+      console.log('Email configuration not found, skipping password reset email');
+      return { success: true, skipped: true, message: 'Email configuration not available' };
+    }
+
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"${config.email.fromName}" <${config.email.from || config.email.user}>`,
+      to: user.email,
+      subject: `RevibeFit - Password Reset Request`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background: linear-gradient(135deg, #225533 0%, #3f8554 100%);
+              color: white;
+              padding: 30px;
+              text-align: center;
+              border-radius: 10px 10px 0 0;
+            }
+            .content {
+              background: #f9f9f9;
+              padding: 30px;
+              border-radius: 0 0 10px 10px;
+            }
+            .info-box {
+              background: white;
+              padding: 15px;
+              border-left: 4px solid #3f8554;
+              margin: 15px 0;
+            }
+            .reset-button {
+              display: inline-block;
+              background: linear-gradient(135deg, #225533 0%, #3f8554 100%);
+              color: white;
+              padding: 14px 32px;
+              text-decoration: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: bold;
+              margin: 20px 0;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+              color: #666;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>🔐 Password Reset</h1>
+            <p>We received a request to reset your password</p>
+          </div>
+          <div class="content">
+            <h2>Hi ${user.name},</h2>
+            <p>You recently requested to reset your password for your RevibeFit account. Click the button below to reset it:</p>
+            
+            <div style="text-align: center;">
+              <a href="${resetUrl}" class="reset-button" style="color: white;">Reset My Password</a>
+            </div>
+
+            <div class="info-box">
+              <strong>⏰ This link expires in 1 hour.</strong>
+              <p style="margin: 5px 0 0 0;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+            </div>
+
+            <p style="font-size: 13px; color: #666;">If the button above doesn't work, copy and paste the following URL into your browser:</p>
+            <p style="font-size: 12px; word-break: break-all; color: #3f8554;">${resetUrl}</p>
+
+            <p>Best regards,<br><strong>The RevibeFit Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message from RevibeFit. Please do not reply to this email.</p>
+            <p>&copy; ${new Date().getFullYear()} RevibeFit. All rights reserved.</p>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Hi ${user.name},
+
+        You recently requested to reset your password for your RevibeFit account.
+
+        Click the following link to reset your password:
+        ${resetUrl}
+
+        This link expires in 1 hour.
+
+        If you didn't request a password reset, you can safely ignore this email.
+
+        Best regards,
+        The RevibeFit Team
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Password reset email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send deactivation email to manager
+export const sendDeactivationEmail = async (user) => {
+  try {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
+      console.log('Email configuration not found, skipping deactivation email');
+      return { success: true, skipped: true, message: 'Email configuration not available' };
+    }
+
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"${config.email.fromName}" <${config.email.from || config.email.user}>`,
+      to: user.email,
+      subject: `RevibeFit - Your Manager Account Has Been Deactivated`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background: #dc3545;
+              color: white;
+              padding: 30px;
+              text-align: center;
+              border-radius: 10px 10px 0 0;
+            }
+            .content {
+              background: #f9f9f9;
+              padding: 30px;
+              border-radius: 0 0 10px 10px;
+            }
+            .info-box {
+              background: white;
+              padding: 15px;
+              border-left: 4px solid #dc3545;
+              margin: 15px 0;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+              color: #666;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Account Deactivated</h1>
+            <p>Your manager account has been deactivated</p>
+          </div>
+          <div class="content">
+            <h2>Dear ${user.name},</h2>
+            <p>We're writing to inform you that your manager account on RevibeFit has been deactivated by an administrator.</p>
+
+            <div class="info-box">
+              <strong>Account Details:</strong>
+              <p><strong>Email:</strong> ${user.email}</p>
+              <p><strong>Account Type:</strong> ${user.managerType === 'trainer_manager' ? 'Trainer Manager' : 'Lab Manager'}</p>
+              <p><strong>Regions:</strong> ${user.assignedRegions?.join(', ') || 'Not assigned'}</p>
+            </div>
+
+            <p>You will no longer be able to access your manager dashboard or perform any management actions.</p>
+
+            <p>If you believe this was done in error, please contact the RevibeFit administration team for further assistance.</p>
+
+            <p>Best regards,<br><strong>The RevibeFit Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message from RevibeFit. Please do not reply to this email.</p>
+            <p>&copy; ${new Date().getFullYear()} RevibeFit. All rights reserved.</p>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Dear ${user.name},
+
+        We're writing to inform you that your manager account on RevibeFit has been deactivated by an administrator.
+
+        Account Details:
+        - Email: ${user.email}
+        - Account Type: ${user.managerType === 'trainer_manager' ? 'Trainer Manager' : 'Lab Manager'}
+        - Regions: ${user.assignedRegions?.join(', ') || 'Not assigned'}
+
+        You will no longer be able to access your manager dashboard or perform any management actions.
+
+        If you believe this was done in error, please contact the RevibeFit administration team.
+
+        Best regards,
+        The RevibeFit Team
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Deactivation email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending deactivation email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send "request more info" email to trainer or lab partner
+export const sendRequestMoreInfoEmail = async (user, message) => {
+  try {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
+      console.log('Email configuration not found, skipping request-more-info email');
+      return { success: false, error: 'Email configuration missing' };
+    }
+
+    const transporter = createTransporter();
+
+    const roleLabel = user.userType === 'trainer' ? 'Trainer' : 'Lab Partner';
+
+    const mailOptions = {
+      from: `"RevibeFit" <${config.email.user}>`,
+      to: user.email,
+      subject: `RevibeFit — Additional Information Required for Your ${roleLabel} Application`,
+      text: `
+        Dear ${user.name},
+
+        Thank you for your interest in joining RevibeFit as a ${roleLabel}.
+
+        We need some additional information before we can process your application:
+
+        ---
+        ${message}
+        ---
+
+        Please reply to this email with the requested information at your earliest convenience.
+
+        Best regards,
+        The RevibeFit Team
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Request more info email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending request-more-info email:', error);
     return { success: false, error: error.message };
   }
 };

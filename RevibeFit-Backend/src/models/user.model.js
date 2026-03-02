@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { USER_TYPES } from "../constants.js";
+import { USER_TYPES, MANAGER_TYPES, INDIAN_STATES, REGION_NAMES } from "../constants.js";
 import config from "../config/index.js";
 
 const userSchema = new mongoose.Schema(
@@ -34,7 +34,12 @@ const userSchema = new mongoose.Schema(
     },
     age: {
       type: Number,
-      required: [true, "Age is required"],
+      required: [
+        function () {
+          return this.userType !== USER_TYPES.MANAGER;
+        },
+        "Age is required",
+      ],
       min: [13, "Age must be at least 13"],
       max: [100, "Age must be less than 100"],
     },
@@ -42,6 +47,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "User type is required"],
       enum: Object.values(USER_TYPES),
+    },
+
+    // Location fields (all users)
+    city: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    state: {
+      type: String,
+      enum: [...INDIAN_STATES, null],
+      trim: true,
+      default: null,
     },
 
     // Fitness Enthusiast specific fields
@@ -64,6 +82,23 @@ const userSchema = new mongoose.Schema(
       required: function () {
         return this.userType === USER_TYPES.TRAINER;
       },
+    },
+    // Trainer — government ID document (optional at signup)
+    governmentId: {
+      type: String, // file path
+      default: null,
+    },
+    // Trainer — social links (all optional)
+    socialLinks: {
+      instagram: { type: String, default: null },
+      youtube: { type: String, default: null },
+      twitter: { type: String, default: null },
+      website: { type: String, default: null },
+    },
+    // Trainer bio / experience (optional)
+    bio: {
+      type: String,
+      default: null,
     },
     // Trainer earnings tracking
     totalEarnings: {
@@ -115,6 +150,21 @@ const userSchema = new mongoose.Schema(
         return this.userType === USER_TYPES.LAB_PARTNER;
       },
     },
+    // Lab Partner — accreditation documents (optional at signup)
+    accreditationDocs: {
+      type: String, // file path
+      default: null,
+    },
+    // Lab Partner — lab images (optional)
+    labImages: {
+      type: [String], // array of file paths
+      default: [],
+    },
+    // Lab Partner — operating hours (day-by-day)
+    operatingHours: {
+      type: mongoose.Schema.Types.Mixed, // { monday: { open: '09:00', close: '18:00', isOpen: true }, ... }
+      default: null,
+    },
     offeredTests: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -156,6 +206,40 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    // Manager specific fields
+    assignedRegions: {
+      type: [String],
+      enum: REGION_NAMES,
+      default: [],
+      validate: {
+        validator: function (v) {
+          return this.userType !== USER_TYPES.MANAGER || (Array.isArray(v) && v.length > 0);
+        },
+        message: "Managers must have at least one assigned region",
+      },
+    },
+    managerType: {
+      type: String,
+      enum: [MANAGER_TYPES.TRAINER_MANAGER, MANAGER_TYPES.LAB_MANAGER, null],
+      required: function () {
+        return this.userType === USER_TYPES.MANAGER;
+      },
+      default: null,
+    },
+    reportsTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    profilePhoto: {
+      type: String,
+      default: null,
+    },
+    createdByAdmin: {
+      type: String,
+      default: null,
+    },
+
     // Common fields
     isVerified: {
       type: Boolean,
@@ -169,6 +253,22 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isHidden: {
+      type: Boolean,
+      default: false,
+    },
+    hiddenAt: {
+      type: Date,
+      default: null,
+    },
+    deactivatedAt: {
+      type: Date,
+      default: null,
+    },
+    deactivationReason: {
+      type: String,
+      default: null,
+    },
     suspensionReason: {
       type: String,
       default: null,
@@ -180,19 +280,39 @@ const userSchema = new mongoose.Schema(
     isApproved: {
       type: Boolean,
       default: function () {
-        // Fitness enthusiasts are auto-approved, trainers and lab partners need approval
-        return this.userType === USER_TYPES.FITNESS_ENTHUSIAST;
+        // Fitness enthusiasts and managers are auto-approved
+        return this.userType === USER_TYPES.FITNESS_ENTHUSIAST || this.userType === USER_TYPES.MANAGER;
       },
     },
     approvalStatus: {
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: function () {
-        return this.userType === USER_TYPES.FITNESS_ENTHUSIAST ? "approved" : "pending";
+        return (
+          this.userType === USER_TYPES.FITNESS_ENTHUSIAST ||
+          this.userType === USER_TYPES.MANAGER
+        )
+          ? "approved"
+          : "pending";
       },
+    },
+    // Claim/lock system for pending approvals
+    claimedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    claimedAt: {
+      type: Date,
+      default: null,
     },
     approvedBy: {
       type: String, // Admin email who approved
+      default: null,
+    },
+    approvedByRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       default: null,
     },
     approvedAt: {
@@ -201,6 +321,14 @@ const userSchema = new mongoose.Schema(
     },
     refreshToken: {
       type: String,
+      select: false,
+    },
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
       select: false,
     },
   },

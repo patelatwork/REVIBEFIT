@@ -40,9 +40,12 @@ const signup = asyncHandler(async (req, res) => {
     userType,
     fitnessGoal,
     specialization,
+    bio,
+    socialLinks,
     laboratoryName,
     laboratoryAddress,
     licenseNumber,
+    operatingHours,
     city,
     state,
   } = req.body;
@@ -80,7 +83,7 @@ const signup = asyncHandler(async (req, res) => {
         "Specialization is required for trainers"
       );
     }
-    if (!req.file) {
+    if (!req.files?.certifications?.[0]) {
       throw new ApiError(
         STATUS_CODES.BAD_REQUEST,
         "Certification document is required for trainers"
@@ -123,13 +126,43 @@ const signup = asyncHandler(async (req, res) => {
     userData.fitnessGoal = fitnessGoal;
   } else if (userType === USER_TYPES.TRAINER) {
     userData.specialization = specialization;
-    // Store only the relative path from public folder: temp/filename.pdf
-    // req.file.filename gives just the filename, we prepend temp/
-    userData.certifications = `temp/${req.file.filename}`;
+    userData.certifications = `temp/${req.files.certifications[0].filename}`;
+    // Mandatory trainer fields
+    if (!bio || bio.trim().length < 20) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Bio / Experience is required (minimum 20 characters)");
+    }
+    if (!req.files?.governmentId?.[0]) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Government ID is required for verification");
+    }
+    userData.bio = bio;
+    userData.governmentId = `temp/${req.files.governmentId[0].filename}`;
+    // Parse social links (sent as JSON string from FormData)
+    if (socialLinks) {
+      try {
+        userData.socialLinks = typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
+      } catch (_) { /* ignore malformed data */ }
+    }
   } else if (userType === USER_TYPES.LAB_PARTNER) {
     userData.laboratoryName = laboratoryName;
     userData.laboratoryAddress = laboratoryAddress;
     userData.licenseNumber = licenseNumber;
+    // Mandatory lab partner fields
+    if (!req.files?.accreditationDocs?.[0]) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Accreditation documents are required");
+    }
+    if (!req.files?.labImages?.length) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "At least one lab image is required");
+    }
+    if (!operatingHours) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "Operating hours are required");
+    }
+    const parsedHours = typeof operatingHours === 'string' ? JSON.parse(operatingHours) : operatingHours;
+    if (!Object.values(parsedHours).some(h => h.isOpen)) {
+      throw new ApiError(STATUS_CODES.BAD_REQUEST, "At least one operating day must be specified");
+    }
+    userData.accreditationDocs = `temp/${req.files.accreditationDocs[0].filename}`;
+    userData.labImages = req.files.labImages.map(f => `temp/${f.filename}`);
+    userData.operatingHours = parsedHours;
   }
 
   // Create user in database

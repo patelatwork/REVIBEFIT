@@ -75,11 +75,11 @@ const ManagerUsers = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} managerType={manager.managerType} />
+            <ManagerSidebar managerName={manager.name} assignedRegions={manager.assignedRegions} managerType={manager.managerType} />
             <div className="lg:ml-64 pt-16 lg:pt-0">
                 <div className="p-6 lg:p-8">
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">User Management</h1>
-                    <p className="text-gray-500 mb-6">Manage users in {manager.assignedRegion || 'your region'}</p>
+                    <p className="text-gray-500 mb-6">Manage users in {manager.assignedRegions?.join(', ') || 'your region'}</p>
 
                     {/* Search & Filter */}
                     <div className="flex flex-col sm:flex-row gap-3 mb-6">

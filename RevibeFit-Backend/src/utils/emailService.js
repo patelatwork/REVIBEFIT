@@ -433,7 +433,7 @@ export const sendDeactivationEmail = async (user) => {
               <strong>Account Details:</strong>
               <p><strong>Email:</strong> ${user.email}</p>
               <p><strong>Account Type:</strong> ${user.managerType === 'trainer_manager' ? 'Trainer Manager' : 'Lab Manager'}</p>
-              <p><strong>Region:</strong> ${user.assignedRegion || 'Not assigned'}</p>
+              <p><strong>Regions:</strong> ${user.assignedRegions?.join(', ') || 'Not assigned'}</p>
             </div>
 
             <p>You will no longer be able to access your manager dashboard or perform any management actions.</p>
@@ -457,7 +457,7 @@ export const sendDeactivationEmail = async (user) => {
         Account Details:
         - Email: ${user.email}
         - Account Type: ${user.managerType === 'trainer_manager' ? 'Trainer Manager' : 'Lab Manager'}
-        - Region: ${user.assignedRegion || 'Not assigned'}
+        - Regions: ${user.assignedRegions?.join(', ') || 'Not assigned'}
 
         You will no longer be able to access your manager dashboard or perform any management actions.
 
@@ -473,6 +473,49 @@ export const sendDeactivationEmail = async (user) => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending deactivation email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send "request more info" email to trainer or lab partner
+export const sendRequestMoreInfoEmail = async (user, message) => {
+  try {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
+      console.log('Email configuration not found, skipping request-more-info email');
+      return { success: false, error: 'Email configuration missing' };
+    }
+
+    const transporter = createTransporter();
+
+    const roleLabel = user.userType === 'trainer' ? 'Trainer' : 'Lab Partner';
+
+    const mailOptions = {
+      from: `"RevibeFit" <${config.email.user}>`,
+      to: user.email,
+      subject: `RevibeFit — Additional Information Required for Your ${roleLabel} Application`,
+      text: `
+        Dear ${user.name},
+
+        Thank you for your interest in joining RevibeFit as a ${roleLabel}.
+
+        We need some additional information before we can process your application:
+
+        ---
+        ${message}
+        ---
+
+        Please reply to this email with the requested information at your earliest convenience.
+
+        Best regards,
+        The RevibeFit Team
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Request more info email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending request-more-info email:', error);
     return { success: false, error: error.message };
   }
 };

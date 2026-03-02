@@ -158,7 +158,7 @@ export const verifyManagerOrAdmin = asyncHandler(async (req, res, next) => {
       name: user.name,
       userType: "manager",
       managerType: user.managerType,
-      assignedRegion: user.assignedRegion,
+      assignedRegions: user.assignedRegions,
     };
     next();
   } catch (error) {
@@ -214,7 +214,7 @@ export const verifyManager = asyncHandler(async (req, res, next) => {
       name: user.name,
       userType: "manager",
       managerType: user.managerType,
-      assignedRegion: user.assignedRegion,
+      assignedRegions: user.assignedRegions,
     };
     next();
   } catch (error) {

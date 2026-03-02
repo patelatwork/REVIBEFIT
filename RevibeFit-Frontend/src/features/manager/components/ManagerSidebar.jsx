@@ -27,7 +27,16 @@ const navItems = [
     { id: 'profile', label: 'My Profile', icon: User, path: '/manager/profile' },
 ];
 
-const ManagerSidebar = ({ managerName, assignedRegion, managerType }) => {
+const REGION_COLORS = {
+    'Northern India': 'bg-blue-500/10 text-blue-200',
+    'Southern India': 'bg-emerald-500/10 text-emerald-200',
+    'Eastern India': 'bg-amber-500/10 text-amber-200',
+    'Western India': 'bg-purple-500/10 text-purple-200',
+    'Central India': 'bg-rose-500/10 text-rose-200',
+    'North-Eastern India': 'bg-cyan-500/10 text-cyan-200',
+};
+
+const ManagerSidebar = ({ managerName, assignedRegions, managerType }) => {
     const [collapsed, setCollapsed] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
@@ -92,12 +101,16 @@ const ManagerSidebar = ({ managerName, assignedRegion, managerType }) => {
                     </div>
                 </div>
 
-                {/* Region Badge */}
-                {assignedRegion && (
+                {/* Region Badges */}
+                {assignedRegions && assignedRegions.length > 0 && (
                     <div className="px-6 py-3 border-b border-white/10">
-                        <div className="bg-blue-500/10 rounded-lg px-3 py-2 text-center">
-                            <p className="text-blue-300/60 text-[10px] uppercase tracking-wider">Region</p>
-                            <p className="text-blue-200 text-sm font-medium">{assignedRegion}</p>
+                        <p className="text-blue-300/60 text-[10px] uppercase tracking-wider mb-2">Regions</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {assignedRegions.map(r => (
+                                <span key={r} className={`px-2 py-1 rounded-md text-[11px] font-medium ${REGION_COLORS[r] || 'bg-blue-500/10 text-blue-200'}`}>
+                                    {r.replace(' India', '')}
+                                </span>
+                            ))}
                         </div>
                     </div>
                 )}
@@ -153,7 +166,7 @@ const ManagerSidebar = ({ managerName, assignedRegion, managerType }) => {
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-white text-sm font-medium truncate">{managerName || 'Manager'}</p>
-                            <p className="text-blue-300/60 text-xs truncate">{assignedRegion || 'Manager'}</p>
+                            <p className="text-blue-300/60 text-xs truncate">{assignedRegions?.join(', ') || 'Manager'}</p>
                         </div>
                     </div>
                     <button

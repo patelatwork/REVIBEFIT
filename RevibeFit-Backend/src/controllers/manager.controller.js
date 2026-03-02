@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { STATUS_CODES, USER_TYPES, MANAGER_TYPES } from "../constants.js";
+import { STATUS_CODES, USER_TYPES, MANAGER_TYPES, getStatesForRegions } from "../constants.js";
 import { User } from "../models/user.model.js";
 import { LabBooking } from "../models/labBooking.model.js";
 import { PlatformInvoice } from "../models/platformInvoice.model.js";
@@ -23,13 +23,13 @@ import config from "../config/index.js";
 
 // ─── Helpers ──────────────────────────────────────────────
 
-/** Get the assigned region from the manager on req.user */
-const getRegion = (req) => {
-    const region = req.user?.assignedRegion;
-    if (!region) {
-        throw new ApiError(STATUS_CODES.FORBIDDEN, "Manager has no assigned region");
+/** Get the states covered by the manager's assigned regions */
+const getRegionStates = (req) => {
+    const regions = req.user?.assignedRegions;
+    if (!regions || !regions.length) {
+        throw new ApiError(STATUS_CODES.FORBIDDEN, "Manager has no assigned regions");
     }
-    return region;
+    return getStatesForRegions(regions);
 };
 
 /** Get the manager type from req.user */
@@ -109,14 +109,14 @@ const updateManagerProfile = asyncHandler(async (req, res) => {
 // ─── Pending Approvals (region-scoped) ────────────────────
 
 const getPendingApprovals = asyncHandler(async (req, res) => {
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
     const allowedTypes = getAllowedUserTypes(managerType);
 
     const pendingUsers = await User.find({
         approvalStatus: "pending",
         userType: { $in: allowedTypes.length ? allowedTypes : [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] },
-        state: region,
+        state: { $in: regionStates },
     }).select("-password -refreshToken");
 
     return res.status(STATUS_CODES.SUCCESS).json(
@@ -128,11 +128,11 @@ const getPendingApprovals = asyncHandler(async (req, res) => {
 
 const claimApproval = asyncHandler(async (req, res) => {
     const { userId } = req.params;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
     const allowedTypes = getAllowedUserTypes(managerType);
 
-    const user = await User.findOne({ _id: userId, approvalStatus: "pending", state: region });
+    const user = await User.findOne({ _id: userId, approvalStatus: "pending", state: { $in: regionStates } });
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "Pending user not found in your region");
 
     // Verify manager can handle this user type
@@ -180,11 +180,11 @@ const releaseApproval = asyncHandler(async (req, res) => {
 
 const approveUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
     const allowedTypes = getAllowedUserTypes(managerType);
 
-    const user = await User.findOne({ _id: userId, state: region });
+    const user = await User.findOne({ _id: userId, state: { $in: regionStates } });
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found in your region");
     if (user.approvalStatus === "approved") throw new ApiError(STATUS_CODES.BAD_REQUEST, "Already approved");
 
@@ -222,11 +222,11 @@ const approveUser = asyncHandler(async (req, res) => {
 const rejectUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { reason } = req.body;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
     const allowedTypes = getAllowedUserTypes(managerType);
 
-    const user = await User.findOne({ _id: userId, state: region });
+    const user = await User.findOne({ _id: userId, state: { $in: regionStates } });
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found in your region");
     if (user.approvalStatus === "rejected") throw new ApiError(STATUS_CODES.BAD_REQUEST, "Already rejected");
 
@@ -255,7 +255,7 @@ const rejectUser = asyncHandler(async (req, res) => {
 // ─── User Management (region-scoped) ──────────────────────
 
 const getAllUsers = asyncHandler(async (req, res) => {
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -263,7 +263,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
     const search = req.query.search || "";
     const userType = req.query.userType || "";
 
-    let filter = { state: region };
+    let filter = { state: { $in: regionStates } };
     if (search) {
         const safe = escapeRegex(search);
         filter.$or = [
@@ -298,12 +298,12 @@ const getAllUsers = asyncHandler(async (req, res) => {
 const toggleUserSuspension = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { suspend, reason } = req.body;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
 
     if (typeof suspend !== "boolean") throw new ApiError(STATUS_CODES.BAD_REQUEST, "suspend must be boolean");
 
-    const user = await User.findOne({ _id: userId, state: region });
+    const user = await User.findOne({ _id: userId, state: { $in: regionStates } });
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found in your region");
     if (user.userType === USER_TYPES.ADMIN || user.userType === USER_TYPES.MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Cannot suspend admin or manager accounts");
@@ -330,9 +330,9 @@ const toggleUserSuspension = asyncHandler(async (req, res) => {
 });
 
 const getUserStats = asyncHandler(async (req, res) => {
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
-    const f = { state: region };
+    const f = { state: { $in: regionStates } };
 
     if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
         const [tr, fe, pending] = await Promise.all([
@@ -341,7 +341,7 @@ const getUserStats = asyncHandler(async (req, res) => {
             User.countDocuments({ ...f, approvalStatus: "pending", userType: USER_TYPES.TRAINER }),
         ]);
         return res.status(STATUS_CODES.SUCCESS).json(
-            new ApiResponse(STATUS_CODES.SUCCESS, { trainers: tr, fitnessEnthusiasts: fe, pendingApprovals: pending, region }, "Stats fetched")
+            new ApiResponse(STATUS_CODES.SUCCESS, { trainers: tr, fitnessEnthusiasts: fe, pendingApprovals: pending, regions: req.user.assignedRegions }, "Stats fetched")
         );
     } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
         const [lp, fe, pending] = await Promise.all([
@@ -350,7 +350,7 @@ const getUserStats = asyncHandler(async (req, res) => {
             User.countDocuments({ ...f, approvalStatus: "pending", userType: USER_TYPES.LAB_PARTNER }),
         ]);
         return res.status(STATUS_CODES.SUCCESS).json(
-            new ApiResponse(STATUS_CODES.SUCCESS, { labPartners: lp, fitnessEnthusiasts: fe, pendingApprovals: pending, region }, "Stats fetched")
+            new ApiResponse(STATUS_CODES.SUCCESS, { labPartners: lp, fitnessEnthusiasts: fe, pendingApprovals: pending, regions: req.user.assignedRegions }, "Stats fetched")
         );
     }
 
@@ -364,16 +364,16 @@ const getUserStats = asyncHandler(async (req, res) => {
     ]);
 
     return res.status(STATUS_CODES.SUCCESS).json(
-        new ApiResponse(STATUS_CODES.SUCCESS, { totalUsers: total, fitnessEnthusiasts: fe, trainers: tr, labPartners: lp, pendingApprovals: pending, region }, "Stats fetched")
+        new ApiResponse(STATUS_CODES.SUCCESS, { totalUsers: total, fitnessEnthusiasts: fe, trainers: tr, labPartners: lp, pendingApprovals: pending, regions: req.user.assignedRegions }, "Stats fetched")
     );
 });
 
 const getUserActivity = asyncHandler(async (req, res) => {
     const { userId } = req.params;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
 
-    const user = await User.findOne({ _id: userId, state: region }).select("-password -refreshToken");
+    const user = await User.findOne({ _id: userId, state: { $in: regionStates } }).select("-password -refreshToken");
     if (!user) throw new ApiError(STATUS_CODES.NOT_FOUND, "User not found in your region");
 
     // Type-gate: trainers only viewable by trainer managers, lab partners only by lab managers
@@ -449,9 +449,9 @@ const getLabPartnersWithCommissionRates = asyncHandler(async (req, res) => {
     if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access lab partner data");
     }
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const labPartners = await User.find({
-        userType: USER_TYPES.LAB_PARTNER, isApproved: true, approvalStatus: "approved", state: region,
+        userType: USER_TYPES.LAB_PARTNER, isApproved: true, approvalStatus: "approved", state: { $in: regionStates },
     }).select("name laboratoryName email phone commissionRate unbilledCommissions currentMonthLiability isSuspended");
 
     return res.status(STATUS_CODES.SUCCESS).json(
@@ -465,9 +465,9 @@ const suspendLabForNonPayment = asyncHandler(async (req, res) => {
     }
     const { labPartnerId } = req.params;
     const { invoiceIds, notes } = req.body;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
 
-    const labPartner = await User.findOne({ _id: labPartnerId, userType: USER_TYPES.LAB_PARTNER, state: region });
+    const labPartner = await User.findOne({ _id: labPartnerId, userType: USER_TYPES.LAB_PARTNER, state: { $in: regionStates } });
     if (!labPartner) throw new ApiError(STATUS_CODES.NOT_FOUND, "Lab partner not found in your region");
 
     let suspensionReason = "Suspended for non-payment of platform commissions";
@@ -495,9 +495,9 @@ const unsuspendLab = asyncHandler(async (req, res) => {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can unsuspend labs");
     }
     const { labPartnerId } = req.params;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
 
-    const labPartner = await User.findOne({ _id: labPartnerId, userType: USER_TYPES.LAB_PARTNER, state: region });
+    const labPartner = await User.findOne({ _id: labPartnerId, userType: USER_TYPES.LAB_PARTNER, state: { $in: regionStates } });
     if (!labPartner) throw new ApiError(STATUS_CODES.NOT_FOUND, "Lab partner not found in your region");
     if (!labPartner.isSuspended) throw new ApiError(STATUS_CODES.BAD_REQUEST, "Not currently suspended");
 
@@ -517,7 +517,7 @@ const unsuspendLab = asyncHandler(async (req, res) => {
 
 const requestCommissionRateChange = asyncHandler(async (req, res) => {
     const { targetUserId, proposedRate, reason } = req.body;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
 
     if (!targetUserId || proposedRate === undefined || !reason) {
         throw new ApiError(STATUS_CODES.BAD_REQUEST, "targetUserId, proposedRate, and reason are required");
@@ -526,7 +526,7 @@ const requestCommissionRateChange = asyncHandler(async (req, res) => {
     const target = await User.findOne({
         _id: targetUserId,
         userType: { $in: getAllowedUserTypes(getManagerType(req)).length ? getAllowedUserTypes(getManagerType(req)) : [USER_TYPES.TRAINER, USER_TYPES.LAB_PARTNER] },
-        state: region,
+        state: { $in: regionStates },
     });
     if (!target) throw new ApiError(STATUS_CODES.NOT_FOUND, "Target user not found in your region or outside your scope");
 
@@ -565,8 +565,8 @@ const getMyCommissionRequests = asyncHandler(async (req, res) => {
 // ─── Invoice Management (region-scoped) ───────────────────
 
 /** Get lab partner IDs in manager's region */
-const getRegionLabPartnerIds = async (region) => {
-    const partners = await User.find({ userType: USER_TYPES.LAB_PARTNER, state: region }).select("_id");
+const getRegionLabPartnerIds = async (regionStates) => {
+    const partners = await User.find({ userType: USER_TYPES.LAB_PARTNER, state: { $in: regionStates } }).select("_id");
     return partners.map((p) => p._id);
 };
 
@@ -574,8 +574,8 @@ const getAllInvoices = asyncHandler(async (req, res) => {
     if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access invoices");
     }
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
     const { status, month, year, labPartnerId } = req.query;
 
     let query = { labPartnerId: { $in: labPartnerIds } };
@@ -595,8 +595,8 @@ const getInvoiceById = asyncHandler(async (req, res) => {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access invoices");
     }
     const { invoiceId } = req.params;
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
 
     const invoice = await PlatformInvoice.findOne({ _id: invoiceId, labPartnerId: { $in: labPartnerIds } })
         .populate("labPartnerId", "name laboratoryName email phone laboratoryAddress")
@@ -615,11 +615,11 @@ const generateMonthlyInvoice = asyncHandler(async (req, res) => {
     }
     const { labPartnerId } = req.params;
     const { month, year, dueDay } = req.body;
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
 
     if (!month || !year) throw new ApiError(STATUS_CODES.BAD_REQUEST, "Month and year required");
 
-    const labPartner = await User.findOne({ _id: labPartnerId, userType: USER_TYPES.LAB_PARTNER, state: region });
+    const labPartner = await User.findOne({ _id: labPartnerId, userType: USER_TYPES.LAB_PARTNER, state: { $in: regionStates } });
     if (!labPartner) throw new ApiError(STATUS_CODES.NOT_FOUND, "Lab partner not found in your region");
 
     const startDate = new Date(year, month - 1, 1);
@@ -677,8 +677,8 @@ const markInvoiceAsPaid = asyncHandler(async (req, res) => {
     }
     const { invoiceId } = req.params;
     const { paymentMethod, paymentReference, paymentNotes } = req.body;
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
 
     const invoice = await PlatformInvoice.findOne({ _id: invoiceId, labPartnerId: { $in: labPartnerIds } });
     if (!invoice) throw new ApiError(STATUS_CODES.NOT_FOUND, "Invoice not found in your region");
@@ -718,8 +718,8 @@ const enforceOverdueInvoices = asyncHandler(async (req, res) => {
     if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can enforce overdue invoices");
     }
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
     const now = new Date();
 
     const overdueInvoices = await PlatformInvoice.find({
@@ -762,8 +762,8 @@ const getInvoiceRequests = asyncHandler(async (req, res) => {
     if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access invoice requests");
     }
-    const region = getRegion(req);
-    const labPartners = await User.find({ userType: USER_TYPES.LAB_PARTNER, isApproved: true, approvalStatus: "approved", state: region, unbilledCommissions: { $gt: 0 } })
+    const regionStates = getRegionStates(req);
+    const labPartners = await User.find({ userType: USER_TYPES.LAB_PARTNER, isApproved: true, approvalStatus: "approved", state: { $in: regionStates }, unbilledCommissions: { $gt: 0 } })
         .select("name laboratoryName email phone unbilledCommissions currentMonthLiability");
 
     const data = [];
@@ -779,8 +779,8 @@ const getGracePeriodStatus = asyncHandler(async (req, res) => {
     if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access grace period status");
     }
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
     const now = new Date();
 
     const pending = await PlatformInvoice.find({ status: "payment_due", labPartnerId: { $in: labPartnerIds } }).populate("labPartnerId", "name laboratoryName email");
@@ -809,9 +809,9 @@ const getGracePeriodStatus = asyncHandler(async (req, res) => {
 // ─── Analytics (region-scoped) ────────────────────────────
 
 const getDashboardAnalytics = asyncHandler(async (req, res) => {
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
-    const regionFilter = { state: region };
+    const regionFilter = { state: { $in: regionStates } };
     const now = new Date();
     const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const sevenDaysAgo = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -845,7 +845,7 @@ const getDashboardAnalytics = asyncHandler(async (req, res) => {
 
         return res.status(STATUS_CODES.SUCCESS).json(
             new ApiResponse(STATUS_CODES.SUCCESS, {
-                region,
+                regions: req.user.assignedRegions,
                 managerType,
                 overview: { totalTrainers: tr, fitnessEnthusiasts: fe, pendingApprovals: pendingTrainer, activeTrainers, suspendedTrainers, newTrainersThisMonth: newThisMonth },
                 liveClasses: { total: totalClasses, totalBookings: totalClassBookings, bookingsThisMonth: classBookingsThisMonth },
@@ -864,7 +864,7 @@ const getDashboardAnalytics = asyncHandler(async (req, res) => {
             User.countDocuments({ ...regionFilter, userType: USER_TYPES.LAB_PARTNER, createdAt: { $gte: thirtyDaysAgo } }),
         ]);
 
-        const labPartnerIds = await getRegionLabPartnerIds(region);
+        const labPartnerIds = await getRegionLabPartnerIds(regionStates);
         const [totalLabBookings, labBookingsThisMonth] = await Promise.all([
             LabBooking.countDocuments({ labPartnerId: { $in: labPartnerIds } }),
             LabBooking.countDocuments({ labPartnerId: { $in: labPartnerIds }, createdAt: { $gte: thirtyDaysAgo } }),
@@ -888,7 +888,7 @@ const getDashboardAnalytics = asyncHandler(async (req, res) => {
 
         return res.status(STATUS_CODES.SUCCESS).json(
             new ApiResponse(STATUS_CODES.SUCCESS, {
-                region,
+                regions: req.user.assignedRegions,
                 managerType,
                 overview: { totalLabPartners: lp, fitnessEnthusiasts: fe, pendingApprovals: pendingLab, activeLabs, suspendedLabs, newLabsThisMonth: newThisMonth },
                 labs: { totalBookings: totalLabBookings, bookingsThisMonth: labBookingsThisMonth },
@@ -907,7 +907,7 @@ const getDashboardAnalytics = asyncHandler(async (req, res) => {
 
     return res.status(STATUS_CODES.SUCCESS).json(
         new ApiResponse(STATUS_CODES.SUCCESS, {
-            region,
+            regions: req.user.assignedRegions,
             managerType: managerType || "unknown",
             overview: { totalUsers, pendingApprovals: pending },
         }, "Dashboard analytics fetched")
@@ -915,7 +915,7 @@ const getDashboardAnalytics = asyncHandler(async (req, res) => {
 });
 
 const getMonthlyGrowth = asyncHandler(async (req, res) => {
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
     const now = new Date();
     const twelveMonthsAgo = new Date(); twelveMonthsAgo.setMonth(now.getMonth() - 11); twelveMonthsAgo.setDate(1); twelveMonthsAgo.setHours(0, 0, 0, 0);
@@ -929,7 +929,7 @@ const getMonthlyGrowth = asyncHandler(async (req, res) => {
     }
 
     const data = await User.aggregate([
-        { $match: { createdAt: { $gte: twelveMonthsAgo }, state: region, ...matchUserTypes } },
+        { $match: { createdAt: { $gte: twelveMonthsAgo }, state: { $in: regionStates }, ...matchUserTypes } },
         {
             $group: {
                 _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 },
@@ -947,10 +947,10 @@ const getMonthlyGrowth = asyncHandler(async (req, res) => {
 });
 
 const getUserDistribution = asyncHandler(async (req, res) => {
-    const region = getRegion(req);
+    const regionStates = getRegionStates(req);
     const managerType = getManagerType(req);
 
-    let matchFilter = { state: region };
+    let matchFilter = { state: { $in: regionStates } };
     if (managerType === MANAGER_TYPES.TRAINER_MANAGER) {
         matchFilter.userType = { $in: [USER_TYPES.TRAINER, USER_TYPES.FITNESS_ENTHUSIAST] };
     } else if (managerType === MANAGER_TYPES.LAB_MANAGER) {
@@ -969,8 +969,8 @@ const getLabEarningsOverTime = asyncHandler(async (req, res) => {
     if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access lab earnings");
     }
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
     const { period = "12months" } = req.query;
 
     let startDate = new Date();
@@ -994,8 +994,8 @@ const getTopLabPartners = asyncHandler(async (req, res) => {
     if (getManagerType(req) !== MANAGER_TYPES.LAB_MANAGER) {
         throw new ApiError(STATUS_CODES.FORBIDDEN, "Only lab managers can access top lab partners");
     }
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
 
     const top = await LabBooking.aggregate([
         { $match: { status: { $in: ["completed", "confirmed"] }, paymentReceivedByLab: true, labPartnerId: { $in: labPartnerIds } } },
@@ -1011,9 +1011,9 @@ const getTopLabPartners = asyncHandler(async (req, res) => {
 });
 
 const getPlatformRevenue = asyncHandler(async (req, res) => {
-    const region = getRegion(req);
-    const labPartnerIds = await getRegionLabPartnerIds(region);
-    const trainerIds = (await User.find({ state: region, userType: USER_TYPES.TRAINER }).select("_id")).map((t) => t._id);
+    const regionStates = getRegionStates(req);
+    const labPartnerIds = await getRegionLabPartnerIds(regionStates);
+    const trainerIds = (await User.find({ state: { $in: regionStates }, userType: USER_TYPES.TRAINER }).select("_id")).map((t) => t._id);
 
     const trainerComm = await ClassBooking.aggregate([
         { $match: { bookingStatus: { $in: ["active", "completed"] }, paymentStatus: "completed", trainerId: { $in: trainerIds } } },
@@ -1029,7 +1029,7 @@ const getPlatformRevenue = asyncHandler(async (req, res) => {
 
     return res.status(STATUS_CODES.SUCCESS).json(
         new ApiResponse(STATUS_CODES.SUCCESS, {
-            region,
+            regions: req.user.assignedRegions,
             summary: { totalPlatformRevenue: tc.totalTrainerCommission + lc.totalLabCommission, trainerCommissionTotal: tc.totalTrainerCommission, labCommissionTotal: lc.totalLabCommission },
         }, "Platform revenue fetched")
     );

@@ -4,6 +4,7 @@ import {
   getPendingApprovals,
   approveUser,
   rejectUser,
+  requestMoreInfo,
   getUserStats,
   getMonthlyGrowth,
   getUserDistribution,
@@ -39,6 +40,7 @@ import {
   removeManager,
   reactivateManager,
   permanentlyDeleteManager,
+  updateManagerRegions,
   getManagerActivityLog,
   getPendingCommissionRequests,
   handleCommissionRateRequest,
@@ -149,6 +151,36 @@ router.post("/approve/:userId", approveUser);
  *         description: User rejected
  */
 router.post("/reject/:userId", rejectUser);
+
+/**
+ * @swagger
+ * /api/admin/request-info/{userId}:
+ *   post:
+ *     summary: Request more information from a pending trainer or lab partner
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - message
+ *             properties:
+ *               message:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Email sent to user requesting more information
+ */
+router.post("/request-info/:userId", requestMoreInfo);
 
 // ─── Dashboard statistics ─────────────────────────────────
 
@@ -653,6 +685,7 @@ router.get("/managers/:id/detail", validateObjectId("id"), getManagerDetail);
 router.delete("/managers/:id", validateObjectId("id"), removeManager);
 router.patch("/managers/:id/reactivate", validateObjectId("id"), reactivateManager);
 router.delete("/managers/:id/permanent", validateObjectId("id"), permanentlyDeleteManager);
+router.patch("/managers/:id/regions", validateObjectId("id"), updateManagerRegions);
 router.get("/managers/:id/activity-log", validateObjectId("id"), getManagerActivityLog);
 
 // ─── Commission Rate Requests ────────────────────────────

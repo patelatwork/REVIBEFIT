@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { USER_TYPES, MANAGER_TYPES, INDIAN_STATES } from "../constants.js";
+import { USER_TYPES, MANAGER_TYPES, INDIAN_STATES, REGION_NAMES } from "../constants.js";
 import config from "../config/index.js";
 
 const userSchema = new mongoose.Schema(
@@ -83,6 +83,23 @@ const userSchema = new mongoose.Schema(
         return this.userType === USER_TYPES.TRAINER;
       },
     },
+    // Trainer — government ID document (optional at signup)
+    governmentId: {
+      type: String, // file path
+      default: null,
+    },
+    // Trainer — social links (all optional)
+    socialLinks: {
+      instagram: { type: String, default: null },
+      youtube: { type: String, default: null },
+      twitter: { type: String, default: null },
+      website: { type: String, default: null },
+    },
+    // Trainer bio / experience (optional)
+    bio: {
+      type: String,
+      default: null,
+    },
     // Trainer earnings tracking
     totalEarnings: {
       type: Number,
@@ -133,6 +150,21 @@ const userSchema = new mongoose.Schema(
         return this.userType === USER_TYPES.LAB_PARTNER;
       },
     },
+    // Lab Partner — accreditation documents (optional at signup)
+    accreditationDocs: {
+      type: String, // file path
+      default: null,
+    },
+    // Lab Partner — lab images (optional)
+    labImages: {
+      type: [String], // array of file paths
+      default: [],
+    },
+    // Lab Partner — operating hours (day-by-day)
+    operatingHours: {
+      type: mongoose.Schema.Types.Mixed, // { monday: { open: '09:00', close: '18:00', isOpen: true }, ... }
+      default: null,
+    },
     offeredTests: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -175,10 +207,16 @@ const userSchema = new mongoose.Schema(
     },
 
     // Manager specific fields
-    assignedRegion: {
-      type: String,
-      enum: [...INDIAN_STATES, null],
-      default: null,
+    assignedRegions: {
+      type: [String],
+      enum: REGION_NAMES,
+      default: [],
+      validate: {
+        validator: function (v) {
+          return this.userType !== USER_TYPES.MANAGER || (Array.isArray(v) && v.length > 0);
+        },
+        message: "Managers must have at least one assigned region",
+      },
     },
     managerType: {
       type: String,

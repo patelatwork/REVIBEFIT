@@ -1,28 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserCog, Plus, Trash2, Activity, X, Users } from 'lucide-react';
+import { UserCog, Plus, Trash2, Activity, X, Users, MapPin } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 
 const API = 'http://localhost:8000/api/admin';
 
-const INDIAN_STATES = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
-    "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim",
-    "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand",
-    "West Bengal", "Delhi", "Jammu and Kashmir", "Ladakh",
-    "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
-    "Lakshadweep", "Puducherry",
-];
+const INDIAN_REGIONS = {
+    "Northern India": ["Jammu & Kashmir", "Himachal Pradesh", "Punjab", "Uttarakhand", "Haryana", "Delhi", "Chandigarh", "Ladakh", "Rajasthan", "Uttar Pradesh"],
+    "Southern India": ["Andhra Pradesh", "Karnataka", "Kerala", "Tamil Nadu", "Telangana", "Puducherry", "Lakshadweep"],
+    "Eastern India": ["Bihar", "Jharkhand", "Odisha", "West Bengal", "Andaman & Nicobar Islands"],
+    "Western India": ["Gujarat", "Maharashtra", "Goa", "Dadra & Nagar Haveli and Daman & Diu"],
+    "Central India": ["Chhattisgarh", "Madhya Pradesh"],
+    "North-Eastern India": ["Assam", "Arunachal Pradesh", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Tripura", "Sikkim"],
+};
+
+const REGION_NAMES = Object.keys(INDIAN_REGIONS);
+
+const REGION_COLORS = {
+    "Northern India": "bg-blue-100 text-blue-700",
+    "Southern India": "bg-emerald-100 text-emerald-700",
+    "Eastern India": "bg-amber-100 text-amber-700",
+    "Western India": "bg-purple-100 text-purple-700",
+    "Central India": "bg-rose-100 text-rose-700",
+    "North-Eastern India": "bg-cyan-100 text-cyan-700",
+};
 
 const AdminManagers = () => {
     const navigate = useNavigate();
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', phone: '', age: '', assignedRegion: '', managerType: '' });
+    const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', phone: '', age: '', assignedRegions: [], managerType: '' });
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState('');
     const [activityLog, setActivityLog] = useState(null);
@@ -54,6 +63,7 @@ const AdminManagers = () => {
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!createForm.name || !createForm.email || !createForm.password || !createForm.phone || !createForm.managerType || !createForm.age) { setCreateError('Name, email, password, phone, age, and manager type are required'); return; }
+        if (!createForm.assignedRegions.length) { setCreateError('At least one region must be selected'); return; }
         setCreateLoading(true); setCreateError('');
         try {
             const res = await fetch(`${API}/managers`, {
@@ -62,7 +72,7 @@ const AdminManagers = () => {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
-            setShowCreate(false); setCreateForm({ name: '', email: '', password: '', phone: '', age: '', assignedRegion: '', managerType: '' });
+            setShowCreate(false); setCreateForm({ name: '', email: '', password: '', phone: '', age: '', assignedRegions: [], managerType: '' });
             fetchManagers();
         } catch (err) { setCreateError(err.message); } finally { setCreateLoading(false); }
     };
@@ -171,7 +181,12 @@ const AdminManagers = () => {
                                                 {mgr.managerType === 'trainer_manager' ? '🏋️ Trainer Manager' : '🧪 Lab Manager'}
                                             </span>
                                         )}
-                                        <p className="text-sm text-gray-600"><span className="font-medium">Region:</span> {mgr.assignedRegion || 'Not assigned'}</p>
+                                        <p className="text-sm text-gray-600"><span className="font-medium">Regions:</span></p>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {mgr.assignedRegions?.length ? mgr.assignedRegions.map(r => (
+                                                <span key={r} className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${REGION_COLORS[r] || 'bg-gray-100 text-gray-600'}`}>{r.replace(' India', '')}</span>
+                                            )) : <span className="text-xs text-gray-400">Not assigned</span>}
+                                        </div>
                                         <p className="text-sm text-gray-600"><span className="font-medium">Recent actions:</span> {mgr.recentActions || 0} (30 days)</p>
                                         <p className="text-xs text-gray-400">Created: {new Date(mgr.createdAt).toLocaleDateString()}</p>
                                     </div>
@@ -211,10 +226,37 @@ const AdminManagers = () => {
                                 <option value="trainer_manager">Trainer Manager</option>
                                 <option value="lab_manager">Lab Manager</option>
                             </select>
-                            <select value={createForm.assignedRegion} onChange={(e) => setCreateForm(p => ({ ...p, assignedRegion: e.target.value }))} className="w-full px-4 py-3 border rounded-lg text-sm bg-white">
-                                <option value="">Select Region</option>
-                                {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
+
+                            {/* Region Checkboxes */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Assign Regions *</label>
+                                <div className="space-y-2 max-h-64 overflow-y-auto border rounded-lg p-3">
+                                    {REGION_NAMES.map(region => (
+                                        <label key={region} className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${createForm.assignedRegions.includes(region) ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-50 border border-transparent'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={createForm.assignedRegions.includes(region)}
+                                                onChange={(e) => {
+                                                    setCreateForm(p => ({
+                                                        ...p,
+                                                        assignedRegions: e.target.checked
+                                                            ? [...p.assignedRegions, region]
+                                                            : p.assignedRegions.filter(r => r !== region)
+                                                    }));
+                                                }}
+                                                className="mt-1 h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                            />
+                                            <div className="flex-1">
+                                                <span className="text-sm font-medium text-gray-900">{region}</span>
+                                                <p className="text-xs text-gray-500 mt-0.5">{INDIAN_REGIONS[region].join(', ')}</p>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                                {createForm.assignedRegions.length > 0 && (
+                                    <p className="text-xs text-green-600 mt-1">{createForm.assignedRegions.length} region(s) selected</p>
+                                )}
+                            </div>
                             {createError && <p className="text-red-500 text-sm">{createError}</p>}
                             <button type="submit" disabled={createLoading} className="w-full py-3 bg-[#3f8554] text-white rounded-lg font-medium hover:bg-[#225533] disabled:opacity-50">
                                 {createLoading ? 'Creating...' : 'Create Manager'}

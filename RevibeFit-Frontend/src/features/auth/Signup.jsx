@@ -14,6 +14,13 @@ const INDIAN_STATES = [
   "Lakshadweep", "Puducherry",
 ];
 
+const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+const DEFAULT_OPERATING_HOURS = DAYS_OF_WEEK.reduce((acc, day) => {
+  acc[day] = { isOpen: day !== 'sunday', open: '09:00', close: '18:00' };
+  return acc;
+}, {});
+
 const Signup = () => {
   const navigate = useNavigate();
   const [userType, setUserType] = useState('fitness-enthusiast');
@@ -34,12 +41,21 @@ const Signup = () => {
     // Trainer specific
     specialization: '',
     certifications: null,
+    governmentId: null,
+    bio: '',
+    socialInstagram: '',
+    socialYoutube: '',
+    socialTwitter: '',
+    socialWebsite: '',
 
     // Lab Partner specific
     laboratoryName: '',
     laboratoryAddress: '',
-    licenseNumber: ''
+    licenseNumber: '',
+    accreditationDocs: null,
+    labImages: [],
   });
+  const [operatingHours, setOperatingHours] = useState(DEFAULT_OPERATING_HOURS);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -95,6 +111,12 @@ const Signup = () => {
       if (!formData.certifications) {
         newErrors.certifications = 'Certification document is required';
       }
+      if (!formData.bio || formData.bio.trim().length < 20) {
+        newErrors.bio = 'Bio / Experience is required (minimum 20 characters)';
+      }
+      if (!formData.governmentId) {
+        newErrors.governmentId = 'Government ID is required for verification';
+      }
     }
 
     if (userType === 'lab-partner') {
@@ -107,6 +129,15 @@ const Signup = () => {
       if (!formData.licenseNumber || formData.licenseNumber.trim().length < 5) {
         newErrors.licenseNumber = 'Valid license number is required';
       }
+      if (!formData.accreditationDocs) {
+        newErrors.accreditationDocs = 'Accreditation documents are required';
+      }
+      if (!formData.labImages || formData.labImages.length === 0) {
+        newErrors.labImages = 'At least one lab image is required';
+      }
+      if (!Object.values(operatingHours).some(h => h.isOpen)) {
+        newErrors.operatingHours = 'Please specify at least one operating day';
+      }
     }
 
     setErrors(newErrors);
@@ -115,18 +146,25 @@ const Signup = () => {
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'file' ? files[0] : value
-    }));
-
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
+    if (name === 'labImages') {
+      setFormData(prev => ({ ...prev, labImages: Array.from(files).slice(0, 5) }));
+    } else {
+      setFormData(prev => ({
         ...prev,
-        [name]: ''
+        [name]: type === 'file' ? files[0] : value
       }));
     }
+
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleOperatingHourChange = (day, field, value) => {
+    setOperatingHours(prev => ({
+      ...prev,
+      [day]: { ...prev[day], [field]: field === 'isOpen' ? value : value },
+    }));
   };
 
   const handleUserTypeChange = (type) => {
@@ -140,14 +178,37 @@ const Signup = () => {
     if (validateForm()) {
       setLoading(true);
       try {
-        // Create FormData for file upload
         const submitData = new FormData();
+        // Append simple fields
+        const skipKeys = ['certifications', 'governmentId', 'accreditationDocs', 'labImages',
+          'socialInstagram', 'socialYoutube', 'socialTwitter', 'socialWebsite', 'confirmPassword'];
         Object.keys(formData).forEach(key => {
-          if (formData[key] !== null && formData[key] !== '') {
+          if (!skipKeys.includes(key) && formData[key] !== null && formData[key] !== '') {
             submitData.append(key, formData[key]);
           }
         });
         submitData.append('userType', userType);
+
+        // Trainer files + social links
+        if (userType === 'trainer') {
+          if (formData.certifications) submitData.append('certifications', formData.certifications);
+          if (formData.governmentId) submitData.append('governmentId', formData.governmentId);
+          const socialLinks = {};
+          if (formData.socialInstagram) socialLinks.instagram = formData.socialInstagram;
+          if (formData.socialYoutube) socialLinks.youtube = formData.socialYoutube;
+          if (formData.socialTwitter) socialLinks.twitter = formData.socialTwitter;
+          if (formData.socialWebsite) socialLinks.website = formData.socialWebsite;
+          if (Object.keys(socialLinks).length) submitData.append('socialLinks', JSON.stringify(socialLinks));
+        }
+
+        // Lab partner files + operating hours
+        if (userType === 'lab-partner') {
+          if (formData.accreditationDocs) submitData.append('accreditationDocs', formData.accreditationDocs);
+          if (formData.labImages?.length) {
+            formData.labImages.forEach(f => submitData.append('labImages', f));
+          }
+          submitData.append('operatingHours', JSON.stringify(operatingHours));
+        }
 
         console.log('Submitting signup data...');
         console.log('User Type:', userType);
@@ -444,9 +505,24 @@ const Signup = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Certifications (PDF) *
+                    Bio / Experience *
                   </label>
-                  <div className="relative">
+                  <textarea
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    rows="3"
+                    className={`w-full px-4 py-3 border ${errors.bio ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent`}
+                    placeholder="Tell us about your experience and training background (min. 20 characters)"
+                  ></textarea>
+                  {errors.bio && <p className="text-red-500 text-sm mt-1">{errors.bio}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Certifications (PDF) *
+                    </label>
                     <input
                       type="file"
                       name="certifications"
@@ -454,9 +530,63 @@ const Signup = () => {
                       accept=".pdf"
                       className={`w-full px-4 py-3 border ${errors.certifications ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#3f8554] file:text-white hover:file:bg-[#225533]`}
                     />
+                    {errors.certifications && <p className="text-red-500 text-sm mt-1">{errors.certifications}</p>}
+                    <p className="text-gray-500 text-xs mt-1">Upload your training certifications in PDF format</p>
                   </div>
-                  {errors.certifications && <p className="text-red-500 text-sm mt-1">{errors.certifications}</p>}
-                  <p className="text-gray-500 text-xs mt-1">Upload your training certifications in PDF format</p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Government ID (PDF/Image) *
+                    </label>
+                    <input
+                      type="file"
+                      name="governmentId"
+                      onChange={handleChange}
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className={`w-full px-4 py-3 border ${errors.governmentId ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#3f8554] file:text-white hover:file:bg-[#225533]`}
+                    />
+                    {errors.governmentId && <p className="text-red-500 text-sm mt-1">{errors.governmentId}</p>}
+                    <p className="text-gray-500 text-xs mt-1">Upload a government-issued ID for identity verification</p>
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-3">Social Links (optional)</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                      type="url"
+                      name="socialInstagram"
+                      value={formData.socialInstagram}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent"
+                      placeholder="Instagram URL"
+                    />
+                    <input
+                      type="url"
+                      name="socialYoutube"
+                      value={formData.socialYoutube}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent"
+                      placeholder="YouTube URL"
+                    />
+                    <input
+                      type="url"
+                      name="socialTwitter"
+                      value={formData.socialTwitter}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent"
+                      placeholder="X (Twitter) URL"
+                    />
+                    <input
+                      type="url"
+                      name="socialWebsite"
+                      value={formData.socialWebsite}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent"
+                      placeholder="Personal Website URL"
+                    />
+                  </div>
                 </div>
               </>
             )}
@@ -509,6 +639,80 @@ const Signup = () => {
                     placeholder="Complete laboratory address"
                   ></textarea>
                   {errors.laboratoryAddress && <p className="text-red-500 text-sm mt-1">{errors.laboratoryAddress}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Accreditation Documents (PDF) *
+                    </label>
+                    <input
+                      type="file"
+                      name="accreditationDocs"
+                      onChange={handleChange}
+                      accept=".pdf"
+                      className={`w-full px-4 py-3 border ${errors.accreditationDocs ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#3f8554] file:text-white hover:file:bg-[#225533]`}
+                    />
+                    {errors.accreditationDocs && <p className="text-red-500 text-sm mt-1">{errors.accreditationDocs}</p>}
+                    <p className="text-gray-500 text-xs mt-1">Upload your lab accreditation certificate in PDF format</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Lab Images *
+                    </label>
+                    <input
+                      type="file"
+                      name="labImages"
+                      onChange={handleChange}
+                      accept=".jpg,.jpeg,.png,.webp"
+                      multiple
+                      className={`w-full px-4 py-3 border ${errors.labImages ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#3f8554] file:text-white hover:file:bg-[#225533]`}
+                    />
+                    {errors.labImages && <p className="text-red-500 text-sm mt-1">{errors.labImages}</p>}
+                    <p className="text-gray-500 text-xs mt-1">Upload at least 1 photo of your laboratory (up to 5)</p>
+                  </div>
+                </div>
+
+                {/* Operating Hours */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-3">Operating Hours *</p>
+                  {errors.operatingHours && <p className="text-red-500 text-sm mb-2">{errors.operatingHours}</p>}
+                  <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+                    {DAYS_OF_WEEK.map((day) => (
+                      <div key={day} className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 w-28 shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={operatingHours[day].isOpen}
+                            onChange={(e) => handleOperatingHourChange(day, 'isOpen', e.target.checked)}
+                            className="w-4 h-4 text-[#3f8554] border-gray-300 rounded focus:ring-[#3f8554]"
+                          />
+                          <span className="text-sm capitalize font-medium text-gray-700">{day}</span>
+                        </label>
+                        {operatingHours[day].isOpen && (
+                          <div className="flex items-center gap-2 flex-1">
+                            <input
+                              type="time"
+                              value={operatingHours[day].open}
+                              onChange={(e) => handleOperatingHourChange(day, 'open', e.target.value)}
+                              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent"
+                            />
+                            <span className="text-gray-400 text-sm">to</span>
+                            <input
+                              type="time"
+                              value={operatingHours[day].close}
+                              onChange={(e) => handleOperatingHourChange(day, 'close', e.target.value)}
+                              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3f8554] focus:border-transparent"
+                            />
+                          </div>
+                        )}
+                        {!operatingHours[day].isOpen && (
+                          <span className="text-sm text-gray-400 italic">Closed</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </>
             )}

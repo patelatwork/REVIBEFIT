@@ -11,7 +11,7 @@ const managerActivityLogSchema = new mongoose.Schema({
         enum: ["trainer_manager", "lab_manager"],
         required: true,
     },
-    region: {
+    regions: {
         type: String,
         required: true,
     },
@@ -65,7 +65,7 @@ const managerActivityLogSchema = new mongoose.Schema({
 });
 
 // Query indexes
-managerActivityLogSchema.index({ managerType: 1, region: 1, createdAt: -1 });
+managerActivityLogSchema.index({ managerType: 1, regions: 1, createdAt: -1 });
 managerActivityLogSchema.index({ managerId: 1, createdAt: -1 });
 managerActivityLogSchema.index({ action: 1, createdAt: -1 });
 

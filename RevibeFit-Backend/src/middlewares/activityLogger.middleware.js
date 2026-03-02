@@ -23,7 +23,7 @@ export const logManagerActivity = async (
         await ManagerActivityLog.create({
             managerId,
             managerType: req.user?.managerType,
-            region: req.user?.assignedRegion,
+            regions: req.user?.assignedRegions?.join(', ') || 'None',
             action,
             targetModel,
             targetId,

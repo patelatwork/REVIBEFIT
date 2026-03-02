@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { signup, login, logout, changePassword, forgotPassword, resetPassword } from "../controllers/auth.controller.js";
-import { upload } from "../middlewares/multer.middleware.js";
+import { upload, uploadSignup } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { authLimiter } from "../middlewares/rateLimiter.middleware.js";
 
@@ -32,7 +32,7 @@ const router = Router();
  *       429:
  *         description: Too many requests
  */
-router.post("/signup", authLimiter, upload.single("certifications"), signup);
+router.post("/signup", authLimiter, uploadSignup, signup);
 
 /**
  * @swagger

@@ -166,7 +166,7 @@ const ManagerProfile = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} managerType={manager.managerType} />
+            <ManagerSidebar managerName={manager.name} assignedRegions={manager.assignedRegions} managerType={manager.managerType} />
 
             <div className="lg:ml-64 pt-16 lg:pt-0">
                 <div className="p-6 lg:p-8 max-w-4xl mx-auto">
@@ -228,7 +228,7 @@ const ManagerProfile = () => {
                                                     {managerTypeLabel}
                                                 </span>
                                                 <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                                                    {profile.assignedRegion || 'No Region'}
+                                                    {profile.assignedRegions?.join(', ') || 'No Region'}
                                                 </span>
                                             </div>
                                         </div>
@@ -299,9 +299,9 @@ const ManagerProfile = () => {
                                     {/* Region — Read-only */}
                                     <div>
                                         <label className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1.5">
-                                            <MapPin size={14} />Assigned Region
+                                            <MapPin size={14} />Assigned Regions
                                         </label>
-                                        <div className="p-3 bg-gray-50 rounded-lg text-gray-900 text-sm">{profile.assignedRegion || 'Not assigned'}</div>
+                                        <div className="p-3 bg-gray-50 rounded-lg text-gray-900 text-sm">{profile.assignedRegions?.join(', ') || 'Not assigned'}</div>
                                         <p className="text-xs text-gray-400 mt-1">Admin assigned</p>
                                     </div>
 

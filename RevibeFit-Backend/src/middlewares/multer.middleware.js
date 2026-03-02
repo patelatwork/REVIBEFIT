@@ -39,6 +39,17 @@ const imageFileFilter = (req, file, cb) => {
   }
 };
 
+// File filter that allows both PDF and images (for signup with mixed uploads)
+const mixedFileFilter = (req, file, cb) => {
+  const pdfMime = "application/pdf";
+  const imageMimes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+  if (file.mimetype === pdfMime || imageMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only PDF or image files are allowed"), false);
+  }
+};
+
 // Upload middleware for PDF files (certifications, documents)
 export const upload = multer({
   storage: storage,
@@ -56,3 +67,20 @@ export const uploadImage = multer({
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB default
   },
 });
+
+// Signup upload middleware — handles all file fields for all user types:
+//   Trainer:     certifications (PDF, required), governmentId (PDF/image, optional)
+//   Lab Partner: accreditationDocs (PDF, optional), labImages (images, optional, up to 5)
+export const uploadSignup = multer({
+  storage: storage,
+  fileFilter: mixedFileFilter,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024,
+  },
+}).fields([
+  { name: "certifications", maxCount: 1 },
+  { name: "governmentId", maxCount: 1 },
+  { name: "accreditationDocs", maxCount: 1 },
+  { name: "labImages", maxCount: 5 },
+]);
+

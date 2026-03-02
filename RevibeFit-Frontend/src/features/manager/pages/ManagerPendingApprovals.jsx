@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Lock, Unlock, Clock, FileText } from 'lucide-react';
+import { ShieldCheck, Lock, Unlock, Clock, FileText, ExternalLink, Image } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
 
-const API = 'http://localhost:8000/api/manager';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API = `${API_BASE}/api/manager`;
 
 const AVATAR_COLORS = [
     'bg-orange-500', 'bg-blue-500', 'bg-emerald-500', 'bg-violet-500',
@@ -12,6 +13,68 @@ const AVATAR_COLORS = [
 ];
 
 const getAvatarColor = (name = '') => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+
+const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const DAY_ABBR = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
+
+// ── Helpers ─────────────────────────────────────────────────
+const normalisePath = (raw) => {
+    if (!raw) return null;
+    if (raw.startsWith('http')) return raw;
+    let p = raw.replace(/\\/g, '/');
+    if (p.includes('RevibeFit-Backend')) {
+        const parts = p.split('/');
+        p = `temp/${parts[parts.length - 1]}`;
+    } else {
+        p = p.replace(/^public\//, '');
+    }
+    return `${API_BASE}/${p}`;
+};
+
+const isImageUrl = (url) => /\.(jpe?g|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url || '');
+
+// ── Reusable field component ────────────────────────────────
+const Field = ({ label, value }) => (
+    <div>
+        <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+        <p className="text-sm font-semibold text-gray-800">{value || 'N/A'}</p>
+    </div>
+);
+
+const SectionHeader = ({ children }) => (
+    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 mt-1">{children}</h4>
+);
+
+// ── Document embed component ────────────────────────────────
+const DocEmbed = ({ url, label }) => {
+    if (!url) return null;
+    if (isImageUrl(url)) {
+        return (
+            <div className="space-y-1.5">
+                <p className="text-xs font-medium text-gray-500">{label}</p>
+                <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                    <img src={url} alt={label} className="max-w-xs max-h-48 object-contain rounded-lg border border-gray-200 hover:ring-2 hover:ring-emerald-400 transition" />
+                </a>
+            </div>
+        );
+    }
+    return (
+        <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-500">{label}</p>
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                    <ExternalLink size={11} /> Open
+                </a>
+            </div>
+            <iframe
+                src={url}
+                title={label}
+                className="w-full h-48 rounded-lg border border-gray-200 bg-gray-50"
+                sandbox="allow-same-origin"
+            />
+        </div>
+    );
+};
 
 const ApprovalCard = ({ user, manager, actionLoading, onApprove, onReject, onClaim, onRelease }) => {
     const [showRejectForm, setShowRejectForm] = useState(false);
@@ -38,6 +101,12 @@ const ApprovalCard = ({ user, manager, actionLoading, onApprove, onReject, onCla
         ? Math.floor((Date.now() - new Date(user.dateOfBirth).getTime()) / (365.25 * 24 * 3600 * 1000))
         : user.age || '—';
 
+    const certUrl = normalisePath(user.certifications);
+    const govIdUrl = normalisePath(user.governmentId);
+    const accredUrl = normalisePath(user.accreditationDocs);
+    const labImgs = (user.labImages || []).map(normalisePath).filter(Boolean);
+    const hasSocials = user.socialLinks && Object.values(user.socialLinks).some(Boolean);
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -45,7 +114,7 @@ const ApprovalCard = ({ user, manager, actionLoading, onApprove, onReject, onCla
             className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
         >
             <div className="p-6 flex flex-col lg:flex-row gap-6">
-                {/* ── Left content ── */}
+                {/* ── Left: Full profile content ── */}
                 <div className="flex-1 min-w-0">
                     {/* Header row */}
                     <div className="flex items-center gap-4 mb-5">
@@ -72,70 +141,157 @@ const ApprovalCard = ({ user, manager, actionLoading, onApprove, onReject, onCla
                         </div>
                     </div>
 
-                    {/* Info grid */}
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-5">
-                        <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Email</p>
-                            <p className="text-sm font-semibold text-gray-800 truncate">{user.email}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Phone</p>
-                            <p className="text-sm font-semibold text-gray-800">{user.phone || '—'}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Age</p>
-                            <p className="text-sm font-semibold text-gray-800">{age}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Registered</p>
-                            <p className="text-sm font-semibold text-gray-800">{new Date(user.createdAt).toLocaleDateString()}</p>
-                        </div>
-                        {(user.city || user.state) && (
-                            <div className="col-span-2">
-                                <p className="text-xs text-gray-400 mb-0.5">Location</p>
-                                <p className="text-sm font-semibold text-gray-800">{[user.city, user.state].filter(Boolean).join(', ')}</p>
-                            </div>
-                        )}
+                    {/* ── Basic Information ── */}
+                    <SectionHeader>Basic Information</SectionHeader>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 mb-5">
+                        <Field label="Email" value={user.email} />
+                        <Field label="Phone" value={user.phone || '—'} />
+                        <Field label="Age" value={age} />
+                        <Field label="Registered" value={new Date(user.createdAt).toLocaleDateString()} />
+                        <Field label="City" value={user.city} />
+                        <Field label="State" value={user.state} />
                     </div>
 
-                    <hr className="border-gray-100 mb-4" />
+                    <hr className="border-gray-100 mb-5" />
 
-                    {/* Specialization / Lab info */}
+                    {/* ── Trainer: Professional Details ── */}
                     {isTrainer && (
-                        <div className="mb-3">
-                            <p className="text-xs text-gray-400 mb-0.5">Specialization</p>
-                            <p className="text-sm font-semibold text-gray-800">{user.specialization || 'N/A'}</p>
-                        </div>
-                    )}
-                    {isLabPartner && (
-                        <div className="mb-3 grid grid-cols-2 gap-x-8 gap-y-2">
-                            <div>
-                                <p className="text-xs text-gray-400 mb-0.5">Laboratory</p>
-                                <p className="text-sm font-semibold text-gray-800">{user.laboratoryName || 'N/A'}</p>
+                        <>
+                            <SectionHeader>Professional Details</SectionHeader>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-5">
+                                <div className="col-span-2">
+                                    <Field label="Specialization" value={user.specialization} />
+                                </div>
+                                {user.bio && (
+                                    <div className="col-span-2">
+                                        <Field label="Bio / Experience" value={user.bio} />
+                                    </div>
+                                )}
                             </div>
-                            <div>
-                                <p className="text-xs text-gray-400 mb-0.5">License No.</p>
-                                <p className="text-sm font-semibold text-gray-800">{user.licenseNumber || 'N/A'}</p>
-                            </div>
-                        </div>
+
+                            {/* Social Links */}
+                            {hasSocials && (
+                                <>
+                                    <SectionHeader>Social Links</SectionHeader>
+                                    <div className="flex flex-wrap gap-3 mb-5">
+                                        {user.socialLinks.instagram && (
+                                            <a href={user.socialLinks.instagram} target="_blank" rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg text-sm font-medium hover:bg-pink-100 transition-colors">
+                                                <ExternalLink size={14} /> Instagram
+                                            </a>
+                                        )}
+                                        {user.socialLinks.youtube && (
+                                            <a href={user.socialLinks.youtube} target="_blank" rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors">
+                                                <ExternalLink size={14} /> YouTube
+                                            </a>
+                                        )}
+                                        {user.socialLinks.twitter && (
+                                            <a href={user.socialLinks.twitter} target="_blank" rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 text-sky-600 rounded-lg text-sm font-medium hover:bg-sky-100 transition-colors">
+                                                <ExternalLink size={14} /> X (Twitter)
+                                            </a>
+                                        )}
+                                        {user.socialLinks.website && (
+                                            <a href={user.socialLinks.website} target="_blank" rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors">
+                                                <ExternalLink size={14} /> Website
+                                            </a>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Documents (embedded) */}
+                            {(certUrl || govIdUrl) && (
+                                <>
+                                    <SectionHeader>Documents</SectionHeader>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                                        <DocEmbed url={certUrl} label="Certifications" />
+                                        <DocEmbed url={govIdUrl} label="Government ID" />
+                                    </div>
+                                </>
+                            )}
+                        </>
                     )}
 
-                    {/* Certifications / Documents link */}
-                    {(user.certifications?.length > 0 || user.documents?.length > 0 || user.certificate) && (
-                        <a
-                            href={user.certificate || user.certifications?.[0] || user.documents?.[0]}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700"
-                        >
-                            <FileText size={15} />
-                            {isLabPartner ? 'View Documents' : 'View Certifications'}
-                        </a>
+                    {/* ── Lab Partner: Laboratory Details ── */}
+                    {isLabPartner && (
+                        <>
+                            <SectionHeader>Laboratory Details</SectionHeader>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3 mb-5">
+                                <Field label="Laboratory Name" value={user.laboratoryName} />
+                                <Field label="License Number" value={user.licenseNumber} />
+                                <div className="col-span-2">
+                                    <Field label="Laboratory Address" value={user.laboratoryAddress} />
+                                </div>
+                            </div>
+
+                            {/* Operating Hours */}
+                            {user.operatingHours && (
+                                <>
+                                    <SectionHeader>Operating Hours</SectionHeader>
+                                    <div className="bg-gray-50 rounded-xl p-3 mb-5 overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr>
+                                                    {DAYS_OF_WEEK.map((day) => (
+                                                        <th key={day} className="px-2 py-1 text-xs font-bold text-gray-500 text-center">
+                                                            {DAY_ABBR[day]}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    {DAYS_OF_WEEK.map((day) => {
+                                                        const h = user.operatingHours[day];
+                                                        return (
+                                                            <td key={day} className="px-2 py-1.5 text-center">
+                                                                {h?.isOpen ? (
+                                                                    <span className="text-gray-700 text-xs font-medium">{h.open}–{h.close}</span>
+                                                                ) : (
+                                                                    <span className="text-gray-400 text-xs italic">Closed</span>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Documents & Images (embedded) */}
+                            {(accredUrl || labImgs.length > 0) && (
+                                <>
+                                    <SectionHeader>Documents & Images</SectionHeader>
+                                    <div className="space-y-4 mb-5">
+                                        <DocEmbed url={accredUrl} label="Accreditation Documents" />
+                                        {labImgs.length > 0 && (
+                                            <div>
+                                                <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                                                    <Image size={13} /> Lab Images
+                                                </p>
+                                                <div className="flex gap-3 flex-wrap">
+                                                    {labImgs.map((url, i) => (
+                                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                            <img src={url} alt={`Lab ${i + 1}`} className="w-28 h-28 object-cover rounded-lg border border-gray-200 hover:ring-2 hover:ring-emerald-400 transition" />
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </>
                     )}
                 </div>
 
-                {/* ── Right action column ── */}
-                <div className="flex flex-row lg:flex-col justify-end gap-3 lg:w-44 lg:shrink-0">
+                {/* ── Right: Action column ── */}
+                <div className="flex flex-row lg:flex-col justify-start gap-3 lg:w-44 lg:shrink-0 lg:sticky lg:top-6 lg:self-start">
                     {!isClaimedByMe && !isClaimedByOther && (
                         <button
                             onClick={() => onClaim(user._id)}
@@ -315,13 +471,13 @@ const ManagerPendingApprovals = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} managerType={manager.managerType} />
+            <ManagerSidebar managerName={manager.name} assignedRegions={manager.assignedRegions} managerType={manager.managerType} />
             <div className="lg:ml-64 pt-16 lg:pt-0">
                 <div className="p-6 lg:p-8">
                     <div className="flex items-center justify-between mb-8">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Pending Approvals</h1>
-                            <p className="text-gray-500 mt-1">{approvals.length} pending in {manager.assignedRegion || 'your region'}</p>
+                            <p className="text-gray-500 mt-1">{approvals.length} pending in {manager.assignedRegions?.join(', ') || 'your region'}</p>
                         </div>
                         <button onClick={fetchApprovals} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm font-medium">Refresh</button>
                     </div>

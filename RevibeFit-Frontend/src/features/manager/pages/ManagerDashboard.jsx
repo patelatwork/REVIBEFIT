@@ -56,7 +56,7 @@ const ManagerDashboard = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ManagerSidebar managerName={manager.name} assignedRegion={manager.assignedRegion} managerType={manager.managerType} />
+            <ManagerSidebar managerName={manager.name} assignedRegions={manager.assignedRegions} managerType={manager.managerType} />
 
             <div className="lg:ml-64 pt-16 lg:pt-0">
                 <div className="p-6 lg:p-8">
@@ -65,7 +65,7 @@ const ManagerDashboard = () => {
                         <h1 className="text-2xl font-bold text-gray-900">Welcome back, {manager.name || 'Manager'}!</h1>
                         <p className="text-gray-500 mt-1">
                             {manager.managerType === 'trainer_manager' ? '🏋️ Trainer Manager' : manager.managerType === 'lab_manager' ? '🧪 Lab Manager' : 'Manager'}
-                            {' • Region: '}{manager.assignedRegion || 'Not assigned'}
+                            {' • Region: '}{manager.assignedRegions?.join(', ') || 'Not assigned'}
                         </p>
                     </div>
 

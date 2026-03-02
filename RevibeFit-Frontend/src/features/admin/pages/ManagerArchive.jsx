@@ -10,16 +10,19 @@ import AdminSidebar from '../components/AdminSidebar';
 
 const API = 'http://localhost:8000/api/admin';
 
-const INDIAN_STATES = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
-    "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim",
-    "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand",
-    "West Bengal", "Delhi", "Jammu and Kashmir", "Ladakh",
-    "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
-    "Lakshadweep", "Puducherry",
+const REGION_NAMES = [
+    "Northern India", "Southern India", "Eastern India",
+    "Western India", "Central India", "North-Eastern India",
 ];
+
+const REGION_COLORS = {
+    "Northern India": "bg-blue-100 text-blue-700",
+    "Southern India": "bg-emerald-100 text-emerald-700",
+    "Eastern India": "bg-amber-100 text-amber-700",
+    "Western India": "bg-purple-100 text-purple-700",
+    "Central India": "bg-rose-100 text-rose-700",
+    "North-Eastern India": "bg-cyan-100 text-cyan-700",
+};
 
 const STATUS_COLORS = {
     active: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
@@ -39,7 +42,7 @@ const ManagerArchive = () => {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
-    const [regionFilter, setRegionFilter] = useState('');
+    const [regionFilter, setRegionFilter] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
     const [page, setPage] = useState(1);
 
@@ -62,7 +65,7 @@ const ManagerArchive = () => {
             if (search) params.append('search', search);
             if (statusFilter) params.append('status', statusFilter);
             if (typeFilter) params.append('managerType', typeFilter);
-            if (regionFilter) params.append('region', regionFilter);
+            if (regionFilter.length) params.append('region', regionFilter.join(','));
 
             const res = await fetch(`${API}/managers/archive?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -78,7 +81,7 @@ const ManagerArchive = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, search, statusFilter, typeFilter, regionFilter, token]);
+    }, [page, search, statusFilter, typeFilter, regionFilter.join(','), token]);
 
     useEffect(() => {
         if (token) fetchManagers();
@@ -183,11 +186,11 @@ const ManagerArchive = () => {
         setSearch('');
         setStatusFilter('');
         setTypeFilter('');
-        setRegionFilter('');
+        setRegionFilter([]);
         setPage(1);
     };
 
-    const hasActiveFilters = search || statusFilter || typeFilter || regionFilter;
+    const hasActiveFilters = search || statusFilter || typeFilter || regionFilter.length;
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -287,7 +290,8 @@ const ManagerArchive = () => {
                                     exit={{ height: 0, opacity: 0 }}
                                     className="overflow-hidden"
                                 >
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-100">
+                                    <div className="space-y-3 mt-4 pt-4 border-t border-gray-100">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <select
                                             value={statusFilter}
                                             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -306,14 +310,32 @@ const ManagerArchive = () => {
                                             <option value="trainer_manager">Trainer Manager</option>
                                             <option value="lab_manager">Lab Manager</option>
                                         </select>
-                                        <select
-                                            value={regionFilter}
-                                            onChange={(e) => { setRegionFilter(e.target.value); setPage(1); }}
-                                            className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#3f8554]/20"
-                                        >
-                                            <option value="">All Regions</option>
-                                            {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-medium text-gray-500 mb-1.5">Regions</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {REGION_NAMES.map(r => (
+                                                    <label key={r} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors border ${
+                                                        regionFilter.includes(r)
+                                                            ? 'bg-[#3f8554]/10 text-[#3f8554] border-[#3f8554]/30'
+                                                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                                    }`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={regionFilter.includes(r)}
+                                                            onChange={(e) => {
+                                                                setRegionFilter(prev =>
+                                                                    e.target.checked ? [...prev, r] : prev.filter(x => x !== r)
+                                                                );
+                                                                setPage(1);
+                                                            }}
+                                                            className="sr-only"
+                                                        />
+                                                        {r.replace(' India', '')}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
@@ -374,7 +396,13 @@ const ManagerArchive = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className="text-sm text-gray-600">{mgr.assignedRegion || '—'}</span>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {mgr.assignedRegions?.length ? mgr.assignedRegions.map(r => (
+                                                                <span key={r} className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${REGION_COLORS[r] || 'bg-gray-100 text-gray-600'}`}>
+                                                                    {r.replace(' India', '')}
+                                                                </span>
+                                                            )) : <span className="text-sm text-gray-400">—</span>}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
@@ -541,7 +569,19 @@ const ManagerArchive = () => {
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <InfoItem icon={Mail} label="Email" value={managerDetail.manager.email} />
                                                 <InfoItem icon={Phone} label="Phone" value={managerDetail.manager.phone || 'N/A'} />
-                                                <InfoItem icon={MapPin} label="Region" value={managerDetail.manager.assignedRegion || 'Not assigned'} />
+                                                <div className="sm:col-span-2">
+                                                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
+                                                        <MapPin size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 mb-1">Regions</p>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {managerDetail.manager.assignedRegions?.length ? managerDetail.manager.assignedRegions.map(r => (
+                                                                    <span key={r} className={`px-2 py-0.5 rounded text-xs font-medium ${REGION_COLORS[r] || 'bg-gray-100 text-gray-600'}`}>{r}</span>
+                                                                )) : <span className="text-sm text-gray-400">Not assigned</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <InfoItem icon={User} label="Age" value={managerDetail.manager.age || 'N/A'} />
                                                 <InfoItem icon={Calendar} label="Created" value={formatDateTime(managerDetail.manager.createdAt)} />
                                                 <InfoItem icon={Shield} label="Created By" value={managerDetail.manager.createdByAdmin || 'System'} />

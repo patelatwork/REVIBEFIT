@@ -212,26 +212,6 @@ const AdminDashboard = () => {
     return (
       <div className="space-y-6">
         {/* Alert Banners */}
-        {overview.pendingApprovals > 0 && (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-amber-100 p-2 rounded-xl">
-                <AlertTriangle size={20} className="text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-amber-800">
-                  {overview.pendingApprovals} registration{overview.pendingApprovals !== 1 ? 's' : ''} pending approval
-                </p>
-                <p className="text-xs text-amber-600">Review and approve trainer/lab partner registrations</p>
-              </div>
-            </div>
-            <button onClick={() => navigate('/admin/pending-approvals')}
-              className="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors flex items-center gap-1.5 shadow-sm">
-              Review <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
-
         {invoices.overdue > 0 && (
           <div className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">

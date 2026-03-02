@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { TrendingUp, DollarSign, Building2, BarChart3, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
+import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
 const API = 'http://localhost:8000/api/manager';
 
@@ -16,14 +17,13 @@ const ManagerEarnings = () => {
     const [revenue, setRevenue] = useState(null);
     const [timePeriod, setTimePeriod] = useState('12');
 
-    const manager = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = localStorage.getItem('accessToken');
+    const { manager, token, regionsChanged } = useManagerProfile();
 
     useEffect(() => {
-        if (!token) { navigate('/login'); return; }
+        if (!token) return;
         if (manager.managerType !== 'lab_manager') { navigate('/manager/dashboard'); return; }
         fetchAll();
-    }, [timePeriod]);
+    }, [timePeriod, regionsChanged]);
 
     const fetchAll = async () => {
         try {

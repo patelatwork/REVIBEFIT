@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeftRight, Plus, Send, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, User as UserIcon } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
+import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
 const API = 'http://localhost:8000/api/manager';
 
@@ -30,15 +31,11 @@ const ManagerCommissionRequests = () => {
     const [submitting, setSubmitting] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
 
-    const manager = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = localStorage.getItem('accessToken');
-    const isLabManager = manager.managerType === 'lab_manager';
-    const isTrainerManager = manager.managerType === 'trainer_manager';
+    const { manager, token, regionsChanged, isLabManager, isTrainerManager } = useManagerProfile();
 
     useEffect(() => {
-        if (!token) { navigate('/login'); return; }
-        fetchRequests();
-    }, []);
+        if (token) fetchRequests();
+    }, [regionsChanged]);
 
     const fetchRequests = async () => {
         try {

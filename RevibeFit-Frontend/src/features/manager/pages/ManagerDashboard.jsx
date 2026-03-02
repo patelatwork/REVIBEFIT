@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, ShieldCheck, FileText, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
+import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
 const API = 'http://localhost:8000/api/manager';
 
@@ -26,17 +27,14 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
 
 const ManagerDashboard = () => {
     const navigate = useNavigate();
+    const { manager, token, regionsChanged } = useManagerProfile();
     const [dashboard, setDashboard] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const manager = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = localStorage.getItem('accessToken');
-
     useEffect(() => {
-        if (!token) { navigate('/login'); return; }
-        fetchDashboard();
-    }, []);
+        if (token) fetchDashboard();
+    }, [regionsChanged]);
 
     const fetchDashboard = async () => {
         try {

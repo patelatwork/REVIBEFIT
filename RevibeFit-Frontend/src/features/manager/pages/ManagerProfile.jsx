@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Shield, Calendar, Camera, Lock, Eye, EyeOff, CheckCircle, AlertCircle, FileText, ArrowLeftRight } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
+import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
 const API = 'http://localhost:8000/api';
 
@@ -29,14 +30,13 @@ const ManagerProfile = () => {
 
     const [formData, setFormData] = useState({ phone: '', age: '' });
 
-    const manager = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = localStorage.getItem('accessToken');
+    const { manager, token, regionsChanged } = useManagerProfile();
 
     useEffect(() => {
-        if (!token) { navigate('/login'); return; }
+        if (!token) return;
         fetchProfile();
         fetchStats();
-    }, []);
+    }, [regionsChanged]);
 
     const fetchProfile = async () => {
         try {

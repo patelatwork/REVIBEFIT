@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Search, Ban, CheckCircle, Eye } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
+import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
 const API = 'http://localhost:8000/api/manager';
 
 const ManagerUsers = () => {
     const navigate = useNavigate();
+    const { manager, token, regionsChanged } = useManagerProfile();
     const [users, setUsers] = useState([]);
     const [pagination, setPagination] = useState({});
     const [loading, setLoading] = useState(true);
@@ -19,11 +21,7 @@ const ManagerUsers = () => {
     const [suspendModal, setSuspendModal] = useState(null);
     const [suspendReason, setSuspendReason] = useState('');
 
-    const manager = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = localStorage.getItem('accessToken');
-
-    useEffect(() => { if (!token) navigate('/login'); }, []);
-    useEffect(() => { fetchUsers(); }, [page, userType]);
+    useEffect(() => { if (token) fetchUsers(); }, [page, userType, regionsChanged]);
 
     const fetchUsers = async () => {
         try {

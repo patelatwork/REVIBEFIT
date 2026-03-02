@@ -71,7 +71,7 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
 // ─── Static Files & Cookies ─────────────────────────────────────────────────
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "../public")));
 app.use(cookieParser());
 
 // ─── Request Logging ────────────────────────────────────────────────────────

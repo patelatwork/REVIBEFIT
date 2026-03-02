@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Lock, Unlock, Clock, FileText, ExternalLink, Image } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
+import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const API = `${API_BASE}/api/manager`;
@@ -47,31 +48,50 @@ const SectionHeader = ({ children }) => (
 
 // ── Document embed component ────────────────────────────────
 const DocEmbed = ({ url, label }) => {
+    const [imgError, setImgError] = useState(false);
+
     if (!url) return null;
-    if (isImageUrl(url)) {
+
+    if (isImageUrl(url) && !imgError) {
         return (
             <div className="space-y-1.5">
-                <p className="text-xs font-medium text-gray-500">{label}</p>
+                <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-gray-500">{label}</p>
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                        <ExternalLink size={11} /> Open
+                    </a>
+                </div>
                 <a href={url} target="_blank" rel="noopener noreferrer" className="block">
-                    <img src={url} alt={label} className="max-w-xs max-h-48 object-contain rounded-lg border border-gray-200 hover:ring-2 hover:ring-emerald-400 transition" />
+                    <img
+                        src={url}
+                        alt={label}
+                        onError={() => setImgError(true)}
+                        className="max-w-full max-h-52 object-contain rounded-lg border border-gray-200 hover:ring-2 hover:ring-emerald-400 transition bg-gray-50"
+                    />
                 </a>
             </div>
         );
     }
+
+    // PDF or image load failure — show a document card with open link
     return (
         <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-gray-500">{label}</p>
-                <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                    <ExternalLink size={11} /> Open
-                </a>
-            </div>
-            <iframe
-                src={url}
-                title={label}
-                className="w-full h-48 rounded-lg border border-gray-200 bg-gray-50"
-                sandbox="allow-same-origin"
-            />
+            <p className="text-xs font-medium text-gray-500">{label}</p>
+            <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-blue-300 transition-colors group"
+            >
+                <div className="p-2.5 rounded-lg bg-white border border-gray-200 group-hover:border-blue-300 transition-colors shrink-0">
+                    <FileText size={22} className="text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Click to view document</p>
+                </div>
+                <ExternalLink size={15} className="text-blue-500 shrink-0" />
+            </a>
         </div>
     );
 };
@@ -164,7 +184,8 @@ const ApprovalCard = ({ user, manager, actionLoading, onApprove, onReject, onCla
                                 </div>
                                 {user.bio && (
                                     <div className="col-span-2">
-                                        <Field label="Bio / Experience" value={user.bio} />
+                                        <p className="text-xs text-gray-400 mb-0.5">Bio / Experience</p>
+                                        <p className="text-sm font-semibold text-gray-800 whitespace-pre-wrap leading-relaxed">{user.bio}</p>
                                     </div>
                                 )}
                             </div>
@@ -382,18 +403,15 @@ const ApprovalCard = ({ user, manager, actionLoading, onApprove, onReject, onCla
 
 const ManagerPendingApprovals = () => {
     const navigate = useNavigate();
+    const { manager, token, regionsChanged } = useManagerProfile();
     const [approvals, setApprovals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [actionLoading, setActionLoading] = useState({});
 
-    const manager = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = localStorage.getItem('accessToken');
-
     useEffect(() => {
-        if (!token) { navigate('/login'); return; }
-        fetchApprovals();
-    }, []);
+        if (token) fetchApprovals();
+    }, [regionsChanged]);
 
     const fetchApprovals = async () => {
         try {

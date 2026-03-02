@@ -38,6 +38,10 @@ const AdminManagers = () => {
     const [activityManager, setActivityManager] = useState(null);
     const [commissionRequests, setCommissionRequests] = useState([]);
     const [showCommissions, setShowCommissions] = useState(false);
+    const [editRegionManager, setEditRegionManager] = useState(null);
+    const [editRegions, setEditRegions] = useState([]);
+    const [editRegionLoading, setEditRegionLoading] = useState(false);
+    const [editRegionError, setEditRegionError] = useState('');
 
     const token = localStorage.getItem('accessToken');
     useEffect(() => { if (!token) navigate('/login'); else { fetchManagers(); fetchCommissions(); } }, []);
@@ -94,6 +98,29 @@ const AdminManagers = () => {
             setActivityLog(data.data.logs || []);
             setActivityManager(data.data.manager);
         } catch (err) { alert(err.message); }
+    };
+
+    const openEditRegion = (mgr) => {
+        setEditRegionManager(mgr);
+        setEditRegions(mgr.assignedRegions || []);
+        setEditRegionError('');
+    };
+
+    const handleUpdateRegions = async (e) => {
+        e.preventDefault();
+        if (!editRegions.length) { setEditRegionError('At least one region must be selected'); return; }
+        setEditRegionLoading(true); setEditRegionError('');
+        try {
+            const res = await fetch(`${API}/managers/${editRegionManager._id}/regions`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignedRegions: editRegions }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            setEditRegionManager(null);
+            fetchManagers();
+        } catch (err) { setEditRegionError(err.message); } finally { setEditRegionLoading(false); }
     };
 
     const handleCommissionAction = async (id, action, adminResponse) => {
@@ -190,9 +217,12 @@ const AdminManagers = () => {
                                         <p className="text-sm text-gray-600"><span className="font-medium">Recent actions:</span> {mgr.recentActions || 0} (30 days)</p>
                                         <p className="text-xs text-gray-400">Created: {new Date(mgr.createdAt).toLocaleDateString()}</p>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 flex-wrap">
                                         <button onClick={() => viewActivity(mgr._id)} className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center justify-center gap-1">
                                             <Activity size={14} /> Activity
+                                        </button>
+                                        <button onClick={() => openEditRegion(mgr)} className="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 flex items-center gap-1">
+                                            <MapPin size={14} /> Region
                                         </button>
                                         {mgr.isActive && (
                                             <button onClick={() => handleRemove(mgr._id, mgr.name)} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 flex items-center gap-1">
@@ -210,12 +240,12 @@ const AdminManagers = () => {
             {/* Create Manager Modal */}
             {showCreate && (
                 <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full">
-                        <div className="flex items-center justify-between mb-4">
+                    <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100 flex-shrink-0">
                             <h3 className="text-lg font-semibold">Create Manager</h3>
                             <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
                         </div>
-                        <form onSubmit={handleCreate} className="space-y-4">
+                        <form onSubmit={handleCreate} className="space-y-4 overflow-y-auto flex-1 p-6 pt-4">
                             <input value={createForm.name} onChange={(e) => setCreateForm(p => ({ ...p, name: e.target.value }))} placeholder="Full Name *" className="w-full px-4 py-3 border rounded-lg text-sm" />
                             <input type="email" value={createForm.email} onChange={(e) => setCreateForm(p => ({ ...p, email: e.target.value }))} placeholder="Email *" className="w-full px-4 py-3 border rounded-lg text-sm" />
                             <input type="password" value={createForm.password} onChange={(e) => setCreateForm(p => ({ ...p, password: e.target.value }))} placeholder="Password *" className="w-full px-4 py-3 border rounded-lg text-sm" />
@@ -261,6 +291,60 @@ const AdminManagers = () => {
                             <button type="submit" disabled={createLoading} className="w-full py-3 bg-[#3f8554] text-white rounded-lg font-medium hover:bg-[#225533] disabled:opacity-50">
                                 {createLoading ? 'Creating...' : 'Create Manager'}
                             </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Region Modal */}
+            {editRegionManager && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100 flex-shrink-0">
+                            <div>
+                                <h3 className="text-lg font-semibold">Change Region</h3>
+                                <p className="text-sm text-gray-500 mt-0.5">{editRegionManager.name} · {editRegionManager.managerType === 'trainer_manager' ? '🏋️ Trainer Manager' : '🧪 Lab Manager'}</p>
+                            </div>
+                            <button onClick={() => setEditRegionManager(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleUpdateRegions} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="overflow-y-auto flex-1 p-6 pt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Regions *</label>
+                                <div className="space-y-2 border rounded-lg p-3">
+                                    {REGION_NAMES.map(region => (
+                                        <label key={region} className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                            editRegions.includes(region) ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-50 border border-transparent'
+                                        }`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editRegions.includes(region)}
+                                                onChange={(e) => {
+                                                    setEditRegions(prev =>
+                                                        e.target.checked ? [...prev, region] : prev.filter(r => r !== region)
+                                                    );
+                                                }}
+                                                className="mt-1 h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                            />
+                                            <div className="flex-1">
+                                                <span className="text-sm font-medium text-gray-900">{region}</span>
+                                                <p className="text-xs text-gray-500 mt-0.5">{INDIAN_REGIONS[region].join(', ')}</p>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                                {editRegions.length > 0 && (
+                                    <p className="text-xs text-green-600 mt-1">{editRegions.length} region(s) selected</p>
+                                )}
+                                {editRegionError && <p className="text-red-500 text-sm mt-2">{editRegionError}</p>}
+                            </div>
+                            <div className="p-6 pt-0 border-t border-gray-100 flex gap-3">
+                                <button type="button" onClick={() => setEditRegionManager(null)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={editRegionLoading} className="flex-1 py-2.5 bg-[#3f8554] text-white rounded-lg text-sm font-medium hover:bg-[#225533] disabled:opacity-50">
+                                    {editRegionLoading ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>

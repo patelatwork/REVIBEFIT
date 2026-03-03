@@ -1,117 +1,144 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import LabPartnerNavbar from '../components/LabPartnerNavbar';
-import OfferedTestsCard from '../components/OfferedTestsCard';
-import FinancialSummary from '../components/FinancialSummary';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import DashboardNavbar from '../components/DashboardNavbar';
+import TopTestsCard from '../components/dashboard/TopTestsCard';
+import RevenueGaugeCard from '../components/dashboard/RevenueGaugeCard';
+import TotalBookingsCard from '../components/dashboard/TotalBookingsCard';
+import InvoiceOverviewCard from '../components/dashboard/InvoiceOverviewCard';
+import UpcomingBookingsTable from '../components/dashboard/UpcomingBookingsTable';
+import BookingRequestsSidebar from '../components/dashboard/BookingRequestsSidebar';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const LabPartnerDashboard = () => {
   const navigate = useNavigate();
   const [labName, setLabName] = useState('Lab Partner');
+  const [loading, setLoading] = useState(true);
+  const [bookings, setBookings] = useState([]);
+  const [tests, setTests] = useState([]);
+  const [financialSummary, setFinancialSummary] = useState(null);
+
+  const getToken = () => localStorage.getItem('accessToken');
+
+  const fetchData = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const [bookingsRes, testsRes, financialRes] = await Promise.all([
+        fetch(`${API_URL}/api/lab-partners/bookings/lab-bookings`, { headers }).then((r) => r.json()),
+        fetch(`${API_URL}/api/lab-partners/offered-tests`, { headers }).then((r) => r.json()),
+        fetch(`${API_URL}/api/lab-partners/financial-summary`, { headers }).then((r) => r.json()),
+      ]);
+
+      if (bookingsRes.success) setBookings(bookingsRes.data || []);
+      if (testsRes.success) setTests(testsRes.data || []);
+      if (financialRes.success) setFinancialSummary(financialRes.data);
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Check if user is logged in
     const user = localStorage.getItem('user');
     if (!user) {
       navigate('/login');
-    } else {
-      const userData = JSON.parse(user);
-      setLabName(userData.laboratoryName || userData.name || 'Lab Partner');
+      return;
     }
-  }, [navigate]);
+    const userData = JSON.parse(user);
+    setLabName(userData.laboratoryName || userData.name || 'Lab Partner');
+    fetchData();
+  }, [navigate, fetchData]);
+
+  // Greeting based on time of day
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
-    <div className="min-h-screen bg-[#fffff0]">
-      <LabPartnerNavbar labName={labName} />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-4xl font-bold text-[#225533] mb-2">
-          Lab Partner Dashboard
-        </h1>
-        <p className="text-gray-600 mb-8">Welcome back, {labName}!</p>
+    <div className="min-h-screen bg-[#f8faf9]">
+      <DashboardNavbar labName={labName} />
 
-        {/* Offered Tests Card - Full Width */}
-        <div className="mb-6">
-          <OfferedTestsCard />
+      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Welcome header row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {getGreeting()}, {labName}! 👋
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Here's what's happening with your lab today.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search..."
+                className="pl-9 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-xl w-48 focus:outline-none focus:ring-2 focus:ring-[#3f8554]/20 focus:border-[#3f8554] transition-all"
+              />
+            </div>
+
+            {/* Period badge */}
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-600">
+              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+              </svg>
+              Monthly
+            </div>
+          </div>
         </div>
 
-        {/* Financial Summary - Full Width */}
-        <div className="mb-6">
-          <FinancialSummary />
-        </div>
+        {/* Loading skeleton */}
+        {loading ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-1/3 mb-4" />
+                  <div className="h-8 bg-gray-200 rounded w-1/2 mb-3" />
+                  <div className="h-20 bg-gray-100 rounded" />
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="xl:col-span-2 bg-white rounded-2xl p-5 border border-gray-100 animate-pulse h-80" />
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 animate-pulse h-80" />
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Stat cards row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+              <TopTestsCard tests={tests} bookings={bookings} />
+              <RevenueGaugeCard financialSummary={financialSummary} />
+              <TotalBookingsCard bookings={bookings} />
+              <InvoiceOverviewCard financialSummary={financialSummary} />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Quick Stats */}
-          <Link 
-            to="/lab-partner/manage-bookings"
-            className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
-          >
-            <div className="flex items-center mb-4">
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+            {/* Bottom: Table + Sidebar */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="xl:col-span-2">
+                <UpcomingBookingsTable bookings={bookings} />
+              </div>
+              <div>
+                <BookingRequestsSidebar bookings={bookings} onStatusUpdate={fetchData} />
               </div>
             </div>
-            <h2 className="text-xl font-semibold text-[#3f8554] mb-2">Test Bookings</h2>
-            <p className="text-gray-600">View booking requests</p>
-          </Link>
-
-          <Link 
-            to="/lab-partner/invoices"
-            className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
-          >
-            <div className="flex items-center mb-4">
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
-            <h2 className="text-xl font-semibold text-[#3f8554] mb-2">Invoices & Payments</h2>
-            <p className="text-gray-600">View monthly invoices and payment history</p>
-          </Link>
-
-          {/* More sections */}
-          <Link 
-            to="/lab-partner/manage-tests"
-            className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
-          >
-            <div className="flex items-center mb-4">
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-              </div>
-            </div>
-            <h2 className="text-xl font-semibold text-[#3f8554] mb-2">Lab Services</h2>
-            <p className="text-gray-600">Manage available tests</p>
-          </Link>
-
-          <Link to="/lab-partner/reports" className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
-            <h2 className="text-xl font-semibold text-[#3f8554] mb-2">Reports</h2>
-            <p className="text-gray-600">Upload test reports</p>
-          </Link>
-
-          <Link to="/lab-partner/profile" className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-            </div>
-            <h2 className="text-xl font-semibold text-[#3f8554] mb-2">Lab Profile</h2>
-            <p className="text-gray-600">Update lab information</p>
-          </Link>
-        </div>
-      </div>
+          </>
+        )}
+      </main>
     </div>
   );
 };

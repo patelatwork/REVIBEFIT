@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/index.js",
+    "dev": "cd src && nodemon index.js",
     "fix-invoice-index": "node scripts/drop-invoice-unique-index.js",
     "create-test-booking": "node scripts/create-test-booking.js"
   },

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import LabPartnerNavbar from '../components/LabPartnerNavbar';
+import DashboardNavbar from '../components/DashboardNavbar';
 
 const MyInvoices = () => {
   const navigate = useNavigate();
@@ -113,9 +113,9 @@ const MyInvoices = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fffff0]">
-        <LabPartnerNavbar labName={labName} />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="min-h-screen bg-[#f8faf9]">
+        <DashboardNavbar labName={labName} />
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
             <div className="space-y-4">
@@ -130,13 +130,13 @@ const MyInvoices = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#fffff0]">
-      <LabPartnerNavbar labName={labName} />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <DashboardNavbar labName={labName} />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold text-[#225533]">My Invoices</h1>
+          <h1 className="text-2xl font-bold text-gray-800">My Invoices</h1>
           <div className="flex gap-3">
             <button
               onClick={() => navigate('/lab-partner/dashboard')}
@@ -148,43 +148,43 @@ const MyInvoices = () => {
         </div>
 
         {/* Filters */}
-        <div className="mb-6 flex space-x-2">
+        <div className="mb-6 flex flex-wrap gap-2">
           <button
             onClick={() => setFilterStatus('all')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               filterStatus === 'all'
-                ? 'bg-[#3f8554] text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
+                ? 'bg-[#3f8554] text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
             All ({invoices.length})
           </button>
           <button
             onClick={() => setFilterStatus('pending')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               filterStatus === 'pending'
-                ? 'bg-[#3f8554] text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
+                ? 'bg-[#3f8554] text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
             Pending ({invoices.filter(i => i.status === 'payment_due' || i.status === 'overdue').length})
           </button>
           <button
             onClick={() => setFilterStatus('paid')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               filterStatus === 'paid'
-                ? 'bg-[#3f8554] text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
+                ? 'bg-[#3f8554] text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
             Paid ({invoices.filter(i => i.status === 'paid').length})
           </button>
           <button
             onClick={() => setFilterStatus('overdue')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               filterStatus === 'overdue'
-                ? 'bg-[#3f8554] text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
+                ? 'bg-[#3f8554] text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
             Overdue ({invoices.filter(i => i.status === 'overdue' || new Date(i.dueDate) < new Date()).length})
@@ -198,7 +198,7 @@ const MyInvoices = () => {
         )}
 
         {filteredInvoices.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
             <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -208,12 +208,12 @@ const MyInvoices = () => {
         ) : (
           <div className="space-y-4">
             {filteredInvoices.map((invoice) => (
-              <div key={invoice._id} className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+              <div key={invoice._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                   {/* Invoice Info */}
                   <div className="flex-1 mb-4 md:mb-0">
                     <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-xl font-bold text-[#225533]">{invoice.invoiceNumber}</h3>
+                      <h3 className="text-lg font-semibold text-gray-800">{invoice.invoiceNumber}</h3>
                       {getStatusBadge(invoice)}
                     </div>
                     
@@ -281,7 +281,7 @@ const MyInvoices = () => {
                   {/* Amount */}
                   <div className="text-right md:ml-6">
                     <p className="text-sm text-gray-500 mb-1">Total Commission</p>
-                    <p className="text-3xl font-bold text-[#3f8554]">{formatCurrency(invoice.totalCommission)}</p>
+                    <p className="text-2xl font-bold text-[#3f8554]">{formatCurrency(invoice.totalCommission)}</p>
                     
                     {invoice.status !== 'paid' && (
                       <div className="mt-3">
@@ -309,7 +309,7 @@ const MyInvoices = () => {
                       onClick={() => toggleBreakdown(invoice._id)}
                       className="flex items-center justify-between w-full text-left"
                     >
-                      <span className="text-sm font-semibold text-[#225533]">
+                      <span className="text-sm font-semibold text-gray-800">
                         Commission Breakdown ({invoice.commissionBreakdown.length} entries)
                       </span>
                       <svg
@@ -332,7 +332,7 @@ const MyInvoices = () => {
                                 <p className="text-xs text-gray-500">{formatDate(entry.bookingDate)}</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-bold text-[#3f8554]">{formatCurrency(entry.commissionAmount)}</p>
+                                <p className="font-bold text-gray-900">{formatCurrency(entry.commissionAmount)}</p>
                                 <p className="text-xs text-gray-500">{entry.commissionRate}% of {formatCurrency(entry.totalAmount)}</p>
                               </div>
                             </div>

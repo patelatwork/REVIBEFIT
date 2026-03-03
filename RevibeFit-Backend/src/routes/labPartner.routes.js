@@ -26,8 +26,18 @@ import {
 } from "../controllers/labPartner.controller.js";
 import { verifyJWT, verifyUserType } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import mongoose from "mongoose";
 
 const router = Router();
+
+// Middleware to validate :id param is a valid ObjectId.
+// If not, skip this route so named routes (e.g. /offered-tests) can match.
+const validateObjectIdParam = (req, res, next) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return next("route");
+  }
+  next();
+};
 
 // ─── Public routes ────────────────────────────────────────
 
@@ -70,7 +80,7 @@ router.get("/", getApprovedLabPartners);
  *       404:
  *         description: Not found
  */
-router.get("/:id", getLabPartnerById);
+router.get("/:id", validateObjectIdParam, getLabPartnerById);
 
 /**
  * @swagger
@@ -88,7 +98,7 @@ router.get("/:id", getLabPartnerById);
  *       200:
  *         description: List of lab tests
  */
-router.get("/:id/tests", getLabTestsByPartnerId);
+router.get("/:id/tests", validateObjectIdParam, getLabTestsByPartnerId);
 
 // ─── All routes below require authentication ─────────────
 router.use(verifyJWT);

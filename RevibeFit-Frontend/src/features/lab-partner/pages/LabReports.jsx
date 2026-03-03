@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import LabPartnerNavbar from '../components/LabPartnerNavbar';
+import DashboardNavbar from '../components/DashboardNavbar';
 
 const LabReports = () => {
   const navigate = useNavigate();
@@ -98,13 +98,13 @@ const LabReports = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fffff0]">
-      <LabPartnerNavbar labName={labName} />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <DashboardNavbar labName={labName} />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[#225533]">Test Reports</h1>
-          <p className="text-gray-600 mt-2">Upload test reports for confirmed bookings</p>
+          <h1 className="text-2xl font-bold text-gray-800">Test Reports</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Upload test reports for confirmed bookings</p>
         </div>
 
         {loading ? (
@@ -117,7 +117,7 @@ const LabReports = () => {
             {error}
           </div>
         ) : bookings.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -127,11 +127,11 @@ const LabReports = () => {
         ) : (
           <div className="space-y-4">
             {bookings.map((booking) => (
-              <div key={booking._id} className="bg-white rounded-lg shadow p-6">
+              <div key={booking._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-[#225533]">
+                      <h3 className="text-lg font-semibold text-gray-800">
                         Booking #{booking._id?.slice(-6)}
                       </h3>
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
@@ -194,7 +194,7 @@ const LabReports = () => {
                         href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${booking.report}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#3f8554] hover:text-[#225533] text-sm font-medium"
+                        className="text-[#3f8554] hover:text-[#2d6b43] text-sm font-medium"
                       >
                         View Report →
                       </a>
@@ -214,7 +214,7 @@ const LabReports = () => {
                           className="hidden"
                           disabled={uploadingFor === booking._id}
                         />
-                        <span className={`inline-flex items-center px-4 py-2 bg-[#3f8554] text-white rounded-lg hover:bg-[#225533] cursor-pointer ${uploadingFor === booking._id ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <span className={`inline-flex items-center px-4 py-2 bg-[#3f8554] text-white rounded-xl text-sm font-medium hover:bg-[#2d6b43] cursor-pointer transition-colors ${uploadingFor === booking._id ? 'opacity-50 cursor-not-allowed' : ''}`}>
                           {uploadingFor === booking._id ? (
                             <>
                               <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">

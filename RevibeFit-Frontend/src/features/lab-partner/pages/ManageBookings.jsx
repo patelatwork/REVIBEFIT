@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import LabPartnerNavbar from '../components/LabPartnerNavbar';
+import DashboardNavbar from '../components/DashboardNavbar';
 
 const ManageBookings = () => {
   const navigate = useNavigate();
@@ -389,33 +389,53 @@ const ManageBookings = () => {
   const stats = getBookingStats();
 
   return (
-    <div className="min-h-screen bg-[#fffff0]">
-      <LabPartnerNavbar labName={labName} />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <DashboardNavbar labName={labName} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-[#225533] mb-2">Manage Bookings</h1>
-          <p className="text-gray-600">View and manage appointments from fitness enthusiasts</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">Manage Bookings</h1>
+          <p className="text-sm text-gray-500 mt-0.5">View and manage appointments from fitness enthusiasts</p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-500">
-            <p className="text-sm text-gray-600">Total Bookings</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+              </div>
+              <p className="text-xs font-medium text-gray-500">Total Bookings</p>
+            </div>
             <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
-            <p className="text-sm text-gray-600">Pending</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <p className="text-xs font-medium text-gray-500">Pending</p>
+            </div>
+            <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-            <p className="text-sm text-gray-600">Confirmed</p>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <p className="text-xs font-medium text-gray-500">Confirmed</p>
+            </div>
             <p className="text-2xl font-bold text-blue-600">{stats.confirmed}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
-            <p className="text-sm text-gray-600">Completed</p>
-            <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-[#e8f5ec] flex items-center justify-center">
+                <svg className="w-4 h-4 text-[#3f8554]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <p className="text-xs font-medium text-gray-500">Completed</p>
+            </div>
+            <p className="text-2xl font-bold text-[#3f8554]">{stats.completed}</p>
           </div>
         </div>
 
@@ -423,40 +443,40 @@ const ManageBookings = () => {
         <div className="mb-6 flex flex-wrap gap-2">
           <button
             onClick={() => setFilterStatus('all')}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
               filterStatus === 'all'
-                ? 'bg-[#3f8554] text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                ? 'bg-[#3f8554] text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
             All ({bookings.length})
           </button>
           <button
             onClick={() => setFilterStatus('pending')}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
               filterStatus === 'pending'
-                ? 'bg-yellow-500 text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
             Pending ({stats.pending})
           </button>
           <button
             onClick={() => setFilterStatus('confirmed')}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
               filterStatus === 'confirmed'
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                ? 'bg-blue-500 text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
             Confirmed ({stats.confirmed})
           </button>
           <button
             onClick={() => setFilterStatus('completed')}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
               filterStatus === 'completed'
-                ? 'bg-green-500 text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                ? 'bg-[#3f8554] text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
             Completed ({stats.completed})
@@ -476,9 +496,9 @@ const ManageBookings = () => {
             <p className="mt-4 text-gray-600">Loading bookings...</p>
           </div>
         ) : filteredBookings.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
             <svg
-              className="w-24 h-24 mx-auto text-gray-300 mb-4"
+              className="w-20 h-20 mx-auto text-gray-200 mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -502,9 +522,9 @@ const ManageBookings = () => {
         ) : (
           <div className="space-y-8">
             {Object.keys(groupedBookings).length === 0 ? (
-              <div className="bg-white rounded-lg shadow p-12 text-center">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
                 <svg
-                  className="w-24 h-24 mx-auto text-gray-300 mb-4"
+                  className="w-20 h-20 mx-auto text-gray-200 mb-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -531,9 +551,9 @@ const ManageBookings = () => {
                 return (
                   <div key={dateKey} className="space-y-4">
                     {/* Date Header */}
-                    <div className="sticky top-0 z-10 bg-gradient-to-r from-[#3f8554] to-[#225533] text-white py-3 px-6 rounded-lg shadow-md">
+                    <div className="sticky top-0 z-10 bg-white border border-gray-200 text-gray-800 py-3 px-6 rounded-2xl shadow-sm">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
+                        <h2 className="text-base font-semibold flex items-center gap-2">
                           <svg 
                             className="w-6 h-6" 
                             fill="none" 
@@ -549,7 +569,7 @@ const ManageBookings = () => {
                           </svg>
                           {formatDateHeader(firstBooking.createdAt)}
                         </h2>
-                        <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                        <span className="bg-[#e8f5ec] text-[#3f8554] px-3 py-1 rounded-full text-xs font-semibold">
                           {dayBookings.length} {dayBookings.length === 1 ? 'booking' : 'bookings'}
                         </span>
                       </div>
@@ -560,12 +580,12 @@ const ManageBookings = () => {
                       {dayBookings.map((booking) => (
               <div
                 key={booking._id}
-                className="bg-white rounded-lg shadow-lg p-6 border-l-4 border-[#3f8554]"
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow"
               >
                 <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-[#225533]">
+                      <h3 className="text-lg font-semibold text-gray-800">
                         {booking.fitnessEnthusiastId?.name || 'User'}
                       </h3>
                       <span
@@ -624,7 +644,7 @@ const ManageBookings = () => {
 
                 {/* Selected Tests */}
                 <div className="bg-gray-50 rounded-lg p-4 mb-3">
-                  <h4 className="font-semibold text-[#225533] mb-2 text-sm">Tests Booked:</h4>
+                  <h4 className="font-semibold text-gray-700 mb-2 text-sm">Tests Booked:</h4>
                   <ul className="space-y-1">
                     {booking.selectedTests.map((test, index) => (
                       <li key={index} className="flex justify-between text-sm">
@@ -635,7 +655,7 @@ const ManageBookings = () => {
                   </ul>
                   <div className="border-t border-gray-300 mt-2 pt-2 flex justify-between font-bold">
                     <span>Total:</span>
-                    <span className="text-[#225533]">₹{booking.totalAmount}</span>
+                    <span className="text-gray-800">₹{booking.totalAmount}</span>
                   </div>
                 </div>
 

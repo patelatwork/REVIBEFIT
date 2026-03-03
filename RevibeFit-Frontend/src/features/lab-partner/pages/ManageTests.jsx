@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import LabPartnerNavbar from '../components/LabPartnerNavbar';
+import DashboardNavbar from '../components/DashboardNavbar';
 
 const ManageTests = () => {
   const navigate = useNavigate();
@@ -265,20 +265,20 @@ const ManageTests = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fffff0]">
-      <LabPartnerNavbar labName={labName} />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <DashboardNavbar labName={labName} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-[#225533] mb-2">Manage Tests</h1>
-            <p className="text-gray-600">Add and manage the tests you offer</p>
+            <h1 className="text-2xl font-bold text-gray-800">Manage Tests</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Add and manage the tests you offer</p>
           </div>
           <div className="flex gap-3">
             <button
               onClick={handleOpenOfferedTestsModal}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-5 rounded-xl transition-all duration-200 flex items-center"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -287,9 +287,9 @@ const ManageTests = () => {
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-[#3f8554] hover:bg-[#225533] text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center"
+              className="bg-[#3f8554] hover:bg-[#225533] text-white text-sm font-medium py-2.5 px-5 rounded-xl transition-all duration-200 flex items-center"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Add New Test
@@ -310,9 +310,9 @@ const ManageTests = () => {
             <p className="mt-4 text-gray-600">Loading tests...</p>
           </div>
         ) : tests.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
             <svg
-              className="w-24 h-24 mx-auto text-gray-300 mb-4"
+              className="w-20 h-20 mx-auto text-gray-200 mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -328,17 +328,17 @@ const ManageTests = () => {
             <p className="text-gray-400 mb-6">Start by adding the tests your lab offers</p>
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-[#3f8554] hover:bg-[#225533] text-white font-bold py-2 px-6 rounded-lg transition-colors"
+              className="bg-[#3f8554] hover:bg-[#225533] text-white text-sm font-medium py-2 px-5 rounded-xl transition-all duration-200"
             >
               Add Your First Test
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {tests.map((test) => (
-              <div key={test._id} className="bg-white rounded-lg shadow-lg p-6 border-2 border-gray-200">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold text-[#225533]">{test.testName}</h3>
+              <div key={test._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-3">
+                  <h3 className="text-base font-semibold text-gray-800">{test.testName}</h3>
                   {test.category && (
                     <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
                       {test.category}
@@ -405,7 +405,7 @@ const ManageTests = () => {
             <form onSubmit={handleSubmit} className="p-6">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[#225533] font-semibold mb-2">
+                  <label className="block text-gray-700 font-medium text-sm mb-2">
                     Test Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -420,7 +420,7 @@ const ManageTests = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[#225533] font-semibold mb-2">
+                  <label className="block text-gray-700 font-medium text-sm mb-2">
                     Description <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -436,7 +436,7 @@ const ManageTests = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[#225533] font-semibold mb-2">
+                    <label className="block text-gray-700 font-medium text-sm mb-2">
                       Price (₹) <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -452,7 +452,7 @@ const ManageTests = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[#225533] font-semibold mb-2">
+                    <label className="block text-gray-700 font-medium text-sm mb-2">
                       Duration <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -468,7 +468,7 @@ const ManageTests = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[#225533] font-semibold mb-2">Category</label>
+                  <label className="block text-gray-700 font-medium text-sm mb-2">Category</label>
                   <select
                     name="category"
                     value={formData.category}
@@ -484,7 +484,7 @@ const ManageTests = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[#225533] font-semibold mb-2">
+                  <label className="block text-gray-700 font-medium text-sm mb-2">
                     Preparation Instructions
                   </label>
                   <textarea
@@ -508,7 +508,7 @@ const ManageTests = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-[#3f8554] hover:bg-[#225533] text-white font-bold rounded-lg transition-colors"
+                  className="flex-1 px-6 py-3 bg-[#3f8554] hover:bg-[#225533] text-white text-sm font-medium rounded-xl transition-all duration-200"
                 >
                   {editingTest ? 'Update Test' : 'Add Test'}
                 </button>
@@ -574,7 +574,7 @@ const ManageTests = () => {
                       handleCloseOfferedTestsModal();
                       setShowAddModal(true);
                     }}
-                    className="bg-[#3f8554] hover:bg-[#225533] text-white font-bold py-2 px-6 rounded-lg transition-colors"
+                    className="bg-[#3f8554] hover:bg-[#225533] text-white text-sm font-medium py-2 px-5 rounded-xl transition-all duration-200"
                   >
                     Add a Test
                   </button>
@@ -622,7 +622,7 @@ const ManageTests = () => {
                           />
                           <div className="flex-1">
                             <div className="flex items-start justify-between">
-                              <h4 className="font-semibold text-[#225533]">{test.testName}</h4>
+                              <h4 className="font-semibold text-gray-800">{test.testName}</h4>
                               {test.category && (
                                 <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
                                   {test.category}

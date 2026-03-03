@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import LabPartnerNavbar from '../components/LabPartnerNavbar';
+import DashboardNavbar from '../components/DashboardNavbar';
 
 const LabProfile = () => {
   const navigate = useNavigate();
@@ -140,13 +140,13 @@ const LabProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fffff0]">
-      <LabPartnerNavbar labName={labName} />
+    <div className="min-h-screen bg-[#f8faf9]">
+      <DashboardNavbar labName={labName} />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[#225533]">Lab Profile</h1>
-          <p className="text-gray-600 mt-2">Manage your laboratory information</p>
+          <h1 className="text-2xl font-bold text-gray-800">Lab Profile</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Manage your laboratory information</p>
         </div>
 
         {error && (
@@ -161,8 +161,8 @@ const LabProfile = () => {
           </div>
         ) : labData ? (
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-[#3f8554] to-[#225533] h-32"></div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-linear-to-r from-[#3f8554] to-[#2d6b43] h-32"></div>
               <div className="px-6 pb-6">
                 <div className="relative -mt-16 mb-4">
                   <div className="inline-block h-32 w-32 rounded-full border-4 border-white bg-white shadow-lg">
@@ -181,7 +181,7 @@ const LabProfile = () => {
                     {!isEditing && (
                       <button
                         onClick={handleEdit}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#3f8554] text-white rounded-lg hover:bg-[#225533] transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-[#3f8554] text-white rounded-xl text-sm font-medium hover:bg-[#2d6b43] transition-colors"
                       >
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -269,7 +269,7 @@ const LabProfile = () => {
 
                   {isEditing && (
                     <div className="flex gap-4 pt-4 border-t border-gray-200">
-                      <button onClick={handleSave} disabled={saving} className={`flex-1 px-6 py-3 bg-[#3f8554] text-white rounded-lg hover:bg-[#225533] transition-colors font-medium ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      <button onClick={handleSave} disabled={saving} className={`flex-1 px-6 py-3 bg-[#3f8554] text-white rounded-xl hover:bg-[#2d6b43] transition-colors text-sm font-medium ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}>
                         {saving ? (
                           <span className="flex items-center justify-center">
                             <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
@@ -282,7 +282,7 @@ const LabProfile = () => {
                           'Save Changes'
                         )}
                       </button>
-                      <button onClick={handleCancel} disabled={saving} className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+                      <button onClick={handleCancel} disabled={saving} className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium">
                         Cancel
                       </button>
                     </div>
@@ -301,8 +301,8 @@ const LabProfile = () => {
             </div>
 
             {/* Change Password Section */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-bold text-[#225533] mb-1 flex items-center gap-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
                 🔐 Change Password
               </h3>
               <p className="text-sm text-gray-500 mb-5">Update your password to keep your account secure</p>
@@ -337,14 +337,14 @@ const LabProfile = () => {
                   </div>
                 ))}
 
-                <button onClick={handleChangePassword} disabled={changingPassword} className={`px-6 py-3 bg-[#3f8554] text-white rounded-lg hover:bg-[#225533] transition-colors font-medium text-sm ${changingPassword ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <button onClick={handleChangePassword} disabled={changingPassword} className={`px-6 py-3 bg-[#3f8554] text-white rounded-xl hover:bg-[#2d6b43] transition-colors text-sm font-medium ${changingPassword ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   {changingPassword ? 'Changing...' : 'Change Password'}
                 </button>
               </div>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
             <p className="text-gray-500">No profile data available</p>
           </div>
         )}

@@ -4,6 +4,7 @@ import TrainerNavbar from '../components/TrainerNavbar';
 
 const UploadBlog = () => {
   const navigate = useNavigate();
+  const [trainerName, setTrainerName] = useState('Trainer');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -14,6 +15,7 @@ const UploadBlog = () => {
   });
   const [thumbnail, setThumbnail] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [blogs, setBlogs] = useState([]);
   const [loadingBlogs, setLoadingBlogs] = useState(true);
   const [editingBlog, setEditingBlog] = useState(null);
@@ -21,6 +23,11 @@ const UploadBlog = () => {
   const categories = ['Fitness Tips', 'Nutrition', 'Yoga', 'Mental Wellness', 'General'];
 
   useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      const userData = JSON.parse(user);
+      setTrainerName(userData.name || 'Trainer');
+    }
     fetchTrainerBlogs();
   }, []);
 
@@ -288,7 +295,7 @@ const UploadBlog = () => {
 
   return (
     <div className="min-h-screen bg-[#fffff0]">
-      <TrainerNavbar />
+      <TrainerNavbar trainerName={trainerName} />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
@@ -348,24 +355,78 @@ const UploadBlog = () => {
               <label className="block text-gray-700 font-semibold mb-2">
                 Thumbnail Image <span className="text-red-500">*</span>
               </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleThumbnailChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3f8554]"
-                required
-              />
-              <p className="text-sm text-gray-500 mt-1">Maximum file size: 5MB</p>
-              
-              {thumbnailPreview && (
-                <div className="mt-4">
+
+              {thumbnailPreview ? (
+                /* Preview state */
+                <div className="relative rounded-xl overflow-hidden border border-gray-200">
                   <img
                     src={thumbnailPreview}
                     alt="Thumbnail preview"
-                    className="w-full h-64 object-cover rounded-lg"
+                    className="w-full h-56 object-cover"
                   />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                    <label
+                      htmlFor="thumbnail-upload"
+                      className="cursor-pointer px-4 py-2 bg-white text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
+                    >
+                      Change Image
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setThumbnail(null); setThumbnailPreview(null); }}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded">
+                    {thumbnail?.name}
+                  </div>
                 </div>
+              ) : (
+                /* Upload dropzone */
+                <label
+                  htmlFor="thumbnail-upload"
+                  onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleThumbnailChange({ target: { files: [file] } });
+                  }}
+                  className={`flex flex-col items-center justify-center w-full h-44 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-200 ${
+                    isDragOver
+                      ? 'border-[#3f8554] bg-[#e8f5ec]'
+                      : 'border-gray-300 bg-gray-50 hover:border-[#3f8554] hover:bg-[#f4fbf6]'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-2 text-center px-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                      isDragOver ? 'bg-[#3f8554]/10' : 'bg-gray-100'
+                    }`}>
+                      <svg className={`w-6 h-6 transition-colors ${isDragOver ? 'text-[#3f8554]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">
+                        {isDragOver ? 'Drop your image here' : 'Click to upload or drag & drop'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">PNG, JPG, WEBP up to 5MB</p>
+                    </div>
+                  </div>
+                </label>
               )}
+
+              <input
+                id="thumbnail-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleThumbnailChange}
+                className="hidden"
+                required={!thumbnailPreview}
+              />
             </div>
 
             {/* Content */}

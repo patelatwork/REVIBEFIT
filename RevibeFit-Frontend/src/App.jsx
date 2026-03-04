@@ -52,6 +52,24 @@ import ManagerArchive from './features/admin/pages/ManagerArchive'
 import ForgotPassword from './features/auth/ForgotPassword'
 import ResetPassword from './features/auth/ResetPassword'
 
+import CommunityFeed from './features/community/pages/CommunityFeed'
+import PostDetail from './features/community/pages/PostDetail'
+import Challenges from './features/community/pages/Challenges'
+import ChallengeDetail from './features/community/pages/ChallengeDetail'
+import CreateChallenge from './features/community/pages/CreateChallenge'
+
+import TrainerCommunity from './features/trainer/pages/TrainerCommunity'
+import TrainerPostDetail from './features/trainer/pages/TrainerPostDetail'
+import TrainerChallenges from './features/trainer/pages/TrainerChallenges'
+import TrainerChallengeDetail from './features/trainer/pages/TrainerChallengeDetail'
+import TrainerCreateChallenge from './features/trainer/pages/TrainerCreateChallenge'
+
+import AdminCommunity from './features/admin/pages/AdminCommunity'
+import AdminPostDetail from './features/admin/pages/AdminPostDetail'
+import AdminChallenges from './features/admin/pages/AdminChallenges'
+import AdminChallengeDetail from './features/admin/pages/AdminChallengeDetail'
+import AdminCreateChallenge from './features/admin/pages/AdminCreateChallenge'
+
 function App() {
   const [user, setUser] = useState(null);
 
@@ -101,6 +119,13 @@ function App() {
         <Route path="/admin/managers" element={<AdminManagers />} />
         <Route path="/admin/managers/all" element={<ManagerArchive />} />
 
+        {/* Admin Community */}
+        <Route path="/admin/community" element={<AdminCommunity />} />
+        <Route path="/admin/community/post/:postId" element={<AdminPostDetail />} />
+        <Route path="/admin/community/challenges" element={<AdminChallenges />} />
+        <Route path="/admin/community/challenge/create" element={<AdminCreateChallenge />} />
+        <Route path="/admin/community/challenge/:challengeId" element={<AdminChallengeDetail />} />
+
         {/* Manager Routes (no navbar/footer) */}
 
         <Route path="/manager/dashboard" element={<ManagerDashboard />} />
@@ -120,6 +145,13 @@ function App() {
         <Route path="/trainer/schedule" element={<TrainerSchedule />} />
         <Route path="/trainer/earnings" element={<TrainerEarnings />} />
         <Route path="/trainer/profile" element={<TrainerProfile />} />
+
+        {/* Trainer Community */}
+        <Route path="/trainer/community" element={<TrainerCommunity />} />
+        <Route path="/trainer/community/post/:postId" element={<TrainerPostDetail />} />
+        <Route path="/trainer/community/challenges" element={<TrainerChallenges />} />
+        <Route path="/trainer/community/challenge/create" element={<TrainerCreateChallenge />} />
+        <Route path="/trainer/community/challenge/:challengeId" element={<TrainerChallengeDetail />} />
 
         {/* Lab Partner Dashboard (custom navbar, no footer) */}
         <Route path="/lab-partner/dashboard" element={<LabPartnerDashboard />} />
@@ -185,6 +217,63 @@ function App() {
               <Navbar />
             )}
             <NutritionPlan />
+            <Footer />
+          </>
+        } />
+
+        {/* Community Routes */}
+        <Route path="/community" element={
+          <>
+            {isFitnessEnthusiast ? (
+              <FitnessEnthusiastNavbar userName={user?.name} />
+            ) : (
+              <Navbar />
+            )}
+            <CommunityFeed />
+            <Footer />
+          </>
+        } />
+        <Route path="/community/post/:postId" element={
+          <>
+            {isFitnessEnthusiast ? (
+              <FitnessEnthusiastNavbar userName={user?.name} />
+            ) : (
+              <Navbar />
+            )}
+            <PostDetail />
+            <Footer />
+          </>
+        } />
+        <Route path="/community/challenges" element={
+          <>
+            {isFitnessEnthusiast ? (
+              <FitnessEnthusiastNavbar userName={user?.name} />
+            ) : (
+              <Navbar />
+            )}
+            <Challenges />
+            <Footer />
+          </>
+        } />
+        <Route path="/community/challenge/:challengeId" element={
+          <>
+            {isFitnessEnthusiast ? (
+              <FitnessEnthusiastNavbar userName={user?.name} />
+            ) : (
+              <Navbar />
+            )}
+            <ChallengeDetail />
+            <Footer />
+          </>
+        } />
+        <Route path="/community/challenge/create" element={
+          <>
+            {isFitnessEnthusiast ? (
+              <FitnessEnthusiastNavbar userName={user?.name} />
+            ) : (
+              <Navbar />
+            )}
+            <CreateChallenge />
             <Footer />
           </>
         } />

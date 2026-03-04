@@ -7,6 +7,7 @@ const NAV_LINKS = [
   { label: 'My Clients', path: '/trainer/clients' },
   { label: 'Schedule', path: '/trainer/schedule' },
   { label: 'Live Classes', path: '/trainer/live-classes' },
+  { label: 'Community', path: '/trainer/community' },
   { label: 'Blogs', path: '/trainer/upload-blog' },
   { label: 'Earnings', path: '/trainer/earnings' },
 ];

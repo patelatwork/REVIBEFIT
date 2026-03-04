@@ -13,6 +13,7 @@ import {
   Dumbbell,
   ChevronRight,
   UserCog,
+  Trophy,
 } from 'lucide-react';
 import logo from '../../../assets/exercise_8407005.png';
 
@@ -24,6 +25,7 @@ const navItems = [
   { id: 'invoices', label: 'Invoices', path: '/admin/invoices', icon: FileText },
   { id: 'earnings', label: 'Earnings', path: '/admin/earnings', icon: FlaskConical },
   { id: 'managers', label: 'Managers', path: '/admin/managers', icon: UserCog },
+  { id: 'community', label: 'Community', path: '/admin/community', icon: Trophy },
 ];
 
 const AdminSidebar = ({ activeSection, onSectionChange }) => {

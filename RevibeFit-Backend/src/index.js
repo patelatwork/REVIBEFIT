@@ -7,10 +7,10 @@ import { app } from "./app.js";
 import config, { validateConfig } from "./config/index.js";
 import { initSocketIO } from "./socket/index.js";
 
-// Load environment variables from src/.env regardless of cwd
+// Load environment variables from backend root .env regardless of cwd
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-dotenv.config({ path: resolve(__dirname, ".env") });
+dotenv.config({ path: resolve(__dirname, "../.env") });
 
 // Validate required config at startup
 validateConfig();

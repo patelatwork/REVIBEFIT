@@ -9,6 +9,7 @@ const links = [
   { to: '/trainers', label: 'Trainers' },
   { to: '/nutrition', label: 'Nutrition Plan' },
   { to: '/care', label: 'Care' },
+  { to: '/community', label: 'Community' },
   { to: '/blog', label: 'Blog' },
 ];
 

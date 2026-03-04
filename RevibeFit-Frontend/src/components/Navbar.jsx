@@ -58,6 +58,12 @@ const Navbar = () => {
               Care
             </Link>
             <Link 
+              to="/community" 
+              className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
+            >
+              Community
+            </Link>
+            <Link 
               to="/blog" 
               className="text-gray-700 hover:text-[#225533] hover:bg-gray-100 px-3 py-2 rounded font-medium transition-all duration-200"
             >
@@ -151,6 +157,13 @@ const Navbar = () => {
               onClick={() => setIsMenuOpen(false)}
             >
               Care
+            </Link>
+            <Link
+              to="/community"
+              className="block px-3 py-2 rounded-md text-gray-700 hover:text-[#225533] hover:bg-gray-100 font-medium transition-colors duration-200"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Community
             </Link>
             <Link
               to="/blog"

@@ -6,6 +6,7 @@ import connectDB from "./db/index.js";
 import { app } from "./app.js";
 import config, { validateConfig } from "./config/index.js";
 import { initSocketIO } from "./socket/index.js";
+import { initCronJobs } from "./cron/index.js";
 
 // Load environment variables from backend root .env regardless of cwd
 const __filename = fileURLToPath(import.meta.url);
@@ -27,6 +28,9 @@ app.set("io", io);
 // Connect to MongoDB and start server
 connectDB()
   .then(() => {
+    // Initialize cron jobs after DB connection
+    initCronJobs();
+
     const server = httpServer.listen(PORT, () => {
       console.log(`Server is running on port: ${PORT}`);
       console.log(`Environment: ${config.nodeEnv}`);

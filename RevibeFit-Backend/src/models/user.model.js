@@ -171,7 +171,28 @@ const userSchema = new mongoose.Schema(
         ref: "LabTest",
       },
     ],
-    // Lab Partner financial tracking
+    // Lab Partner — Razorpay Route (linked account for settlements)
+    razorpayLinkedAccountId: {
+      type: String,
+      default: null,
+    },
+    razorpayAccountStatus: {
+      type: String,
+      enum: ["pending", "activated", "suspended", null],
+      default: null,
+    },
+    gstin: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    placeOfSupply: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
+    // @deprecated — P2P financial tracking. Use Settlement model for new data.
     unbilledCommissions: {
       type: Number,
       default: function () {

@@ -17,10 +17,11 @@ import {
   uploadReport,
   deleteReport,
   getBookingReport,
-  markUserPaymentReceived,
+
   getMyInvoices,
   getInvoiceById,
   getFinancialSummary,
+  getMySettlements,
   requestInvoice,
   updateLabPartnerProfile,
 } from "../controllers/labPartner.controller.js";
@@ -364,26 +365,6 @@ router.post("/bookings/:bookingId/upload-report", verifyUserType("lab-partner"),
  */
 router.delete("/bookings/:bookingId/report", verifyUserType("lab-partner"), deleteReport);
 
-/**
- * @swagger
- * /api/lab-partners/bookings/{bookingId}/user-payment-received:
- *   patch:
- *     summary: Mark user payment as received (lab partner)
- *     tags: [Lab Partners]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: bookingId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Payment marked as received
- */
-router.patch("/bookings/:bookingId/user-payment-received", verifyUserType("lab-partner"), markUserPaymentReceived);
-
 router.get("/bookings/:bookingId/report", getBookingReport);
 
 // ─── Lab Partner only — financial ────────────────────────
@@ -422,6 +403,36 @@ router.get("/invoices", verifyUserType("lab-partner"), getMyInvoices);
  */
 router.get("/invoices/:invoiceId", verifyUserType("lab-partner"), getInvoiceById);
 
+// Invoice PDF download for lab partner
+router.get("/invoices/:invoiceId/download-pdf", verifyUserType("lab-partner"), async (req, res, next) => {
+  try {
+    const { PlatformInvoice } = await import("../models/platformInvoice.model.js");
+    const path = await import("path");
+    const fs = await import("fs");
+    const { fileURLToPath } = await import("url");
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+
+    const invoice = await PlatformInvoice.findOne({
+      _id: req.params.invoiceId,
+      labPartnerId: req.user._id,
+    });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found" });
+    }
+    if (!invoice.pdfPath) {
+      return res.status(404).json({ success: false, message: "PDF not yet generated" });
+    }
+    const filePath = path.join(__dirname, "../../public", invoice.pdfPath);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: "PDF file not found" });
+    }
+    res.download(filePath, `${invoice.invoiceNumber.replace(/\//g, "-")}.pdf`);
+  } catch (error) {
+    next(error);
+  }
+});
+
 /**
  * @swagger
  * /api/lab-partners/request-invoice:
@@ -449,6 +460,9 @@ router.post("/request-invoice", verifyUserType("lab-partner"), requestInvoice);
  *         description: Financial overview
  */
 router.get("/financial-summary", verifyUserType("lab-partner"), getFinancialSummary);
+
+// Settlement routes
+router.get("/settlements", verifyUserType("lab-partner"), getMySettlements);
 
 // ─── Lab Partner only — profile ──────────────────────────
 

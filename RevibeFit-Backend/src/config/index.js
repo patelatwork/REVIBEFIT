@@ -51,6 +51,28 @@ const config = {
     name: process.env.ADMIN_NAME || "RevibeFit Admin",
   },
 
+  // Razorpay
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID,
+    keySecret: process.env.RAZORPAY_KEY_SECRET,
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+  },
+
+  // Platform (GST / Commission)
+  platform: {
+    gstin: process.env.PLATFORM_GSTIN || "",
+    state: process.env.PLATFORM_STATE || "Maharashtra",
+    sacCode: "999316",
+    commissionDefault: parseInt(process.env.PLATFORM_COMMISSION_DEFAULT) || 20,
+    gstRate: 18,
+  },
+
+  // SMS (MSG91)
+  sms: {
+    apiKey: process.env.MSG91_API_KEY,
+    senderId: process.env.MSG91_SENDER_ID || "RVBFIT",
+  },
+
   // External APIs
   geminiApiKey: process.env.GEMINI_API_KEY,
   fatSecret: {
@@ -74,6 +96,15 @@ const config = {
  */
 export const validateConfig = () => {
   const required = ["MONGODB_URI", "JWT_SECRET"];
+  const productionRequired = [
+    "RAZORPAY_KEY_ID",
+    "RAZORPAY_KEY_SECRET",
+    "RAZORPAY_WEBHOOK_SECRET",
+    "PLATFORM_GSTIN",
+  ];
+  if (process.env.NODE_ENV === "production") {
+    required.push(...productionRequired);
+  }
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {

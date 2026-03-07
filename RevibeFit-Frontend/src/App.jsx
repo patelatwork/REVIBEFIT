@@ -30,6 +30,7 @@ import ManageBookings from './features/lab-partner/pages/ManageBookings'
 import MyInvoices from './features/lab-partner/pages/MyInvoices'
 import LabReports from './features/lab-partner/pages/LabReports'
 import LabProfile from './features/lab-partner/pages/LabProfile'
+import Settlements from './features/lab-partner/pages/Settlements'
 
 import AdminDashboard from './features/admin/pages/AdminDashboard'
 import PendingApprovals from './features/admin/pages/PendingApprovals'
@@ -158,6 +159,7 @@ function App() {
         <Route path="/lab-partner/manage-tests" element={<ManageTests />} />
         <Route path="/lab-partner/manage-bookings" element={<ManageBookings />} />
         <Route path="/lab-partner/invoices" element={<MyInvoices />} />
+        <Route path="/lab-partner/settlements" element={<Settlements />} />
         <Route path="/lab-partner/reports" element={<LabReports />} />
         <Route path="/lab-partner/profile" element={<LabProfile />} />
 

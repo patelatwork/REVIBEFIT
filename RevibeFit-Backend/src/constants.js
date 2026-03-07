@@ -113,6 +113,77 @@ export const getRegionForState = (state) => {
   return null;
 };
 
+// Booking Statuses
+export const BOOKING_STATUSES = {
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  SAMPLE_COLLECTED: "sample-collected",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+};
+
+// Payment Statuses (Razorpay)
+export const PAYMENT_STATUSES = {
+  CREATED: "created",
+  AUTHORIZED: "authorized",
+  CAPTURED: "captured",
+  FAILED: "failed",
+  REFUNDED: "refunded",
+};
+
+// Settlement Statuses
+export const SETTLEMENT_STATUSES = {
+  PENDING: "pending",
+  HOLD_RELEASED: "hold_released",
+  PROCESSING: "processing",
+  SETTLED: "settled",
+  FAILED: "failed",
+};
+
+// Invoice Statuses
+export const INVOICE_STATUSES = {
+  DRAFT: "draft",
+  ISSUED: "issued",
+  PAID: "paid",
+  OVERDUE: "overdue",
+  CANCELLED: "cancelled",
+};
+
+// Refund Statuses
+export const REFUND_STATUSES = {
+  INITIATED: "initiated",
+  PROCESSING: "processing",
+  COMPLETED: "completed",
+  FAILED: "failed",
+};
+
+// GST Types
+export const GST_TYPES = {
+  INTRA_STATE: "intra_state",
+  INTER_STATE: "inter_state",
+};
+
+// Notification Types
+export const NOTIFICATION_TYPES = {
+  PAYMENT_RECEIVED: "payment_received",
+  SETTLEMENT_PROCESSED: "settlement_processed",
+  INVOICE_GENERATED: "invoice_generated",
+  PAYMENT_REMINDER: "payment_reminder",
+  OVERDUE_WARNING: "overdue_warning",
+  SUSPENSION_NOTICE: "suspension_notice",
+  REFUND_PROCESSED: "refund_processed",
+  BOOKING_CONFIRMED: "booking_confirmed",
+  REPORT_READY: "report_ready",
+  GENERAL: "general",
+};
+
+// Notification Channels
+export const NOTIFICATION_CHANNELS = {
+  IN_APP: "in_app",
+  EMAIL: "email",
+  SMS: "sms",
+};
+
 // HTTP Status Codes
 export const STATUS_CODES = {
   SUCCESS: 200,

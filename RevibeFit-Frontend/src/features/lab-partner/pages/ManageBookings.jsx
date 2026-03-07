@@ -14,7 +14,7 @@ const ManageBookings = () => {
   const [uploadingReport, setUploadingReport] = useState({});
   const [deletingReport, setDeletingReport] = useState({});
   const [selectedFiles, setSelectedFiles] = useState({});
-  const [markingPayment, setMarkingPayment] = useState({});
+
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -200,48 +200,6 @@ const ManageBookings = () => {
     }
   };
 
-  const markUserPaymentReceived = async (bookingId) => {
-    if (!confirm('Confirm that user has paid for this booking? This will automatically track the 10% platform commission.')) {
-      return;
-    }
-
-    setMarkingPayment(prev => ({ ...prev, [`user-${bookingId}`]: true }));
-    setError('');
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/lab-partners/bookings/${bookingId}/user-payment-received`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            paymentMethod: 'cash', // Default, can be made dynamic
-          }),
-        }
-      );
-
-      const data = await response.json();
-      if (data.success) {
-        fetchBookings(); // Refresh the list
-        const revenue = data.data.revenue;
-        if (revenue) {
-          alert(`Payment received! Lab earnings: ₹${revenue.labCash}. Commission (${revenue.commissionRate}%): ₹${revenue.commissionAmount} added to platform debt.`);
-        }
-      } else {
-        setError(data.message || 'Failed to mark user payment');
-      }
-    } catch (err) {
-      console.error('Error marking user payment:', err);
-      setError('Failed to mark user payment');
-    } finally {
-      setMarkingPayment(prev => ({ ...prev, [`user-${bookingId}`]: false }));
-    }
-  };
-
   const handleFileSelect = (bookingId, event) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -305,6 +263,8 @@ const ManageBookings = () => {
         return 'bg-yellow-100 text-yellow-800';
       case 'confirmed':
         return 'bg-blue-100 text-blue-800';
+      case 'sample-collected':
+        return 'bg-purple-100 text-purple-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'cancelled':
@@ -382,6 +342,7 @@ const ManageBookings = () => {
       total: bookings.length,
       pending: bookings.filter(b => b.status === 'pending').length,
       confirmed: bookings.filter(b => b.status === 'confirmed').length,
+      'sample-collected': bookings.filter(b => b.status === 'sample-collected').length,
       completed: bookings.filter(b => b.status === 'completed').length,
     };
   };
@@ -400,7 +361,7 @@ const ManageBookings = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
@@ -427,6 +388,15 @@ const ManageBookings = () => {
               <p className="text-xs font-medium text-gray-500">Confirmed</p>
             </div>
             <p className="text-2xl font-bold text-blue-600">{stats.confirmed}</p>
+          </div>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a2.25 2.25 0 01-1.59.659H9.06a2.25 2.25 0 01-1.59-.659L5 14.5m14 0V17a2 2 0 01-2 2H7a2 2 0 01-2-2v-2.5" /></svg>
+              </div>
+              <p className="text-xs font-medium text-gray-500">Sample Collected</p>
+            </div>
+            <p className="text-2xl font-bold text-purple-600">{stats['sample-collected']}</p>
           </div>
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-2 mb-2">
@@ -470,6 +440,16 @@ const ManageBookings = () => {
             }`}
           >
             Confirmed ({stats.confirmed})
+          </button>
+          <button
+            onClick={() => setFilterStatus('sample-collected')}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+              filterStatus === 'sample-collected'
+                ? 'bg-purple-500 text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            Sample Collected ({stats['sample-collected']})
           </button>
           <button
             onClick={() => setFilterStatus('completed')}
@@ -632,6 +612,14 @@ const ManageBookings = () => {
                       </>
                     )}
                     {booking.status === 'confirmed' && (
+                      <button
+                        onClick={() => updateBookingStatus(booking._id, 'sample-collected')}
+                        className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold rounded transition-colors"
+                      >
+                        Mark Sample Collected
+                      </button>
+                    )}
+                    {booking.status === 'sample-collected' && (
                       <button
                         onClick={() => updateBookingStatus(booking._id, 'completed')}
                         className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded transition-colors"
@@ -871,109 +859,39 @@ const ManageBookings = () => {
                   )}
                 </div>
 
-                {/* Payment Tracking Section */}
+                {/* Payment & Settlement Section */}
                 <div className="border rounded-lg p-4 mb-3 bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200">
                   <h4 className="font-semibold text-emerald-900 flex items-center gap-2 mb-3">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    Payment Tracking
+                    Payment & Settlement
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* User Payment Status */}
-                    <div className="bg-white rounded-lg p-3 border border-emerald-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-semibold text-gray-700">User Payment</p>
-                        {booking.userPaidToLab ? (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Received
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
-                            Not Received
-                          </span>
-                        )}
-                      </div>
-                      
-                      {booking.userPaidToLab ? (
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <p>✓ Amount: ₹{booking.totalAmount}</p>
-                          {booking.userPaymentDate && (
-                            <p>✓ Date: {new Date(booking.userPaymentDate).toLocaleDateString()}</p>
-                          )}
-                          {booking.userPaymentMethod && (
-                            <p>✓ Method: {booking.userPaymentMethod}</p>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => markUserPaymentReceived(booking._id)}
-                          disabled={markingPayment[`user-${booking._id}`]}
-                          className="w-full mt-2 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {markingPayment[`user-${booking._id}`] ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              Mark User Payment Received
-                            </>
-                          )}
-                        </button>
-                      )}
+                  <div className="bg-white rounded-lg p-3 border border-emerald-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-gray-700">Payment Status</p>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                        booking.paymentStatus === 'failed' ? 'bg-red-100 text-red-800' :
+                        booking.paymentStatus === 'refunded' ? 'bg-blue-100 text-blue-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {(booking.paymentStatus || 'pending').toUpperCase()}
+                      </span>
                     </div>
 
-                    {/* Commission Payment Status */}
-                    <div className="bg-white rounded-lg p-3 border border-orange-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-semibold text-gray-700">Platform Commission</p>
-                        {booking.paymentReceivedByLab ? (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Auto-Tracked
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
-                            Pending Payment
-                          </span>
-                        )}
-                      </div>
-                      
-                      {booking.paymentReceivedByLab ? (
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <p>✓ Commission: ₹{booking.commissionAmount || Math.round(booking.totalAmount * 0.1)}</p>
-                          {booking.paymentReceivedDate && (
-                            <p>✓ Tracked: {new Date(booking.paymentReceivedDate).toLocaleDateString()}</p>
-                          )}
-                          <p className="text-orange-600 font-semibold">
-                            Status: {booking.commissionStatus === 'paid' ? 'Paid to Platform' : booking.commissionStatus === 'billed' ? 'Billed' : 'Unbilled'}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-gray-500 space-y-1">
-                          <p className="flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Commission will be automatically tracked when you mark user payment as received
-                          </p>
-                          <p className="text-orange-600 font-semibold">
-                            Expected: ₹{Math.round(booking.totalAmount * 0.1)} (10%)
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    {booking.paymentStatus === 'paid' && (
+                      <p className="text-sm text-gray-600">Paid via Razorpay - ₹{booking.totalAmount}</p>
+                    )}
+
+                    {booking.settlementId ? (
+                      <p className="text-sm text-emerald-700 font-medium mt-1">
+                        Settlement: ₹{booking.settlementAmount || booking.totalAmount} settled
+                      </p>
+                    ) : booking.status === 'completed' && booking.paymentStatus === 'paid' ? (
+                      <p className="text-sm text-amber-600 font-medium mt-1">Settlement pending</p>
+                    ) : null}
                   </div>
                 </div>
 

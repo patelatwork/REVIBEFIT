@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { INVOICE_STATUSES, GST_TYPES } from "../constants.js";
 
 const platformInvoiceSchema = new mongoose.Schema(
   {
@@ -15,28 +16,17 @@ const platformInvoiceSchema = new mongoose.Schema(
       index: true,
     },
     billingPeriod: {
-      month: {
-        type: Number,
-        min: 1,
-        max: 12,
-      },
-      year: {
-        type: Number,
-        min: 2020,
-      },
-      // For custom date ranges
-      startDate: {
-        type: Date,
-      },
-      endDate: {
-        type: Date,
-      },
+      month: { type: Number, min: 1, max: 12 },
+      year: { type: Number, min: 2020 },
+      startDate: { type: Date },
+      endDate: { type: Date },
       type: {
         type: String,
         enum: ["monthly", "weekly", "custom"],
         default: "monthly",
       },
     },
+
     // Financial details
     totalCommission: {
       type: Number,
@@ -46,13 +36,13 @@ const platformInvoiceSchema = new mongoose.Schema(
     numberOfBookings: {
       type: Number,
       required: [true, "Number of bookings is required"],
-      min: [0, "Number of bookings cannot be negative"],
+      min: 0,
       default: 0,
     },
     totalBookingValue: {
       type: Number,
       required: [true, "Total booking value is required"],
-      min: [0, "Total booking value cannot be negative"],
+      min: 0,
       default: 0,
     },
     commissionRate: {
@@ -62,11 +52,44 @@ const platformInvoiceSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
+    // Net settlement amount paid out to the lab partner
+    totalSettlementAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // GST details (B2B tax invoice compliance)
+    gstDetails: {
+      platformGstin: { type: String, default: "" },
+      labPartnerGstin: { type: String, default: "" },
+      placeOfSupply: { type: String, default: "" },
+      sacCode: { type: String, default: "999316" },
+      taxType: {
+        type: String,
+        enum: [...Object.values(GST_TYPES), null],
+        default: null,
+      },
+      taxableValue: { type: Number, default: 0, min: 0 },
+      cgstRate: { type: Number, default: 0 },
+      cgstAmount: { type: Number, default: 0 },
+      sgstRate: { type: Number, default: 0 },
+      sgstAmount: { type: Number, default: 0 },
+      igstRate: { type: Number, default: 0 },
+      igstAmount: { type: Number, default: 0 },
+      totalTaxAmount: { type: Number, default: 0 },
+      totalInvoiceAmount: { type: Number, default: 0 }, // commission + tax
+    },
+
     // Invoice status and dates
     status: {
       type: String,
-      enum: ["payment_due", "paid", "overdue", "cancelled"],
-      default: "payment_due",
+      enum: [
+        ...Object.values(INVOICE_STATUSES),
+        // Keep legacy status for backward compat
+        "payment_due",
+      ],
+      default: INVOICE_STATUSES.ISSUED,
       index: true,
     },
     dueDate: {
@@ -74,29 +97,26 @@ const platformInvoiceSchema = new mongoose.Schema(
       required: [true, "Due date is required"],
       index: true,
     },
+    gracePeriodEnd: {
+      type: Date,
+      default: null,
+    },
     generatedDate: {
       type: Date,
       default: Date.now,
       required: true,
     },
-    paidDate: {
-      type: Date,
-      default: null,
-    },
+    paidDate: { type: Date, default: null },
+
     // Payment details
     paymentMethod: {
       type: String,
       enum: ["bank_transfer", "online", "cash", "cheque", null],
       default: null,
     },
-    paymentReference: {
-      type: String,
-      default: null,
-    },
-    paymentNotes: {
-      type: String,
-      default: null,
-    },
+    paymentReference: { type: String, default: null },
+    paymentNotes: { type: String, default: null },
+
     // Related bookings
     bookingIds: [
       {
@@ -104,12 +124,26 @@ const platformInvoiceSchema = new mongoose.Schema(
         ref: "LabBooking",
       },
     ],
+
+    // Settlement references (new platform-mediated flow)
+    settlementIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Settlement",
+      },
+    ],
+
     // Commission breakdown - detailed list of each booking's commission
     commissionBreakdown: [
       {
         bookingId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "LabBooking",
+        },
+        settlementId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Settlement",
+          default: null,
         },
         fitnessEnthusiastId: {
           type: mongoose.Schema.Types.ObjectId,
@@ -121,78 +155,92 @@ const platformInvoiceSchema = new mongoose.Schema(
         totalAmount: Number,
         commissionAmount: Number,
         commissionRate: Number,
+        gstAmount: { type: Number, default: 0 },
+        netSettlement: { type: Number, default: 0 },
       },
     ],
-    // Invoice request tracking
-    requestedByLabPartner: {
-      type: Boolean,
-      default: false,
-    },
-    requestedDate: {
-      type: Date,
-      default: null,
-    },
-    requestNotes: {
-      type: String,
-      default: null,
-    },
-    // Admin notes
-    notes: {
-      type: String,
-      trim: true,
-    },
+
+    // PDF
+    pdfPath: { type: String, default: null },
+    pdfGeneratedAt: { type: Date, default: null },
+
+    // Reminder tracking
+    reminders: [
+      {
+        type: {
+          type: String,
+          enum: ["pre_due", "on_due", "grace_warning", "grace_final"],
+        },
+        sentAt: Date,
+        channel: {
+          type: String,
+          enum: ["email", "sms", "in_app"],
+        },
+      },
+    ],
+
+    // Generation metadata
+    autoGenerated: { type: Boolean, default: true },
     generatedBy: {
-      type: String, // Admin email who generated the invoice
+      type: String,
       default: "system",
     },
+
+    // Invoice request tracking (lab partner can request early invoice)
+    requestedByLabPartner: { type: Boolean, default: false },
+    requestedDate: { type: Date, default: null },
+    requestNotes: { type: String, default: null },
+
+    notes: { type: String, trim: true },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Compound index for efficient billing period queries (made non-unique to allow multiple invoices per period)
-platformInvoiceSchema.index({ labPartnerId: 1, "billingPeriod.year": 1, "billingPeriod.month": 1 });
-
-// Index for custom date range queries
-platformInvoiceSchema.index({ labPartnerId: 1, "billingPeriod.startDate": 1, "billingPeriod.endDate": 1 });
-
-// Index for status and due date filtering
+// Indexes
+platformInvoiceSchema.index({
+  labPartnerId: 1,
+  "billingPeriod.year": 1,
+  "billingPeriod.month": 1,
+});
+platformInvoiceSchema.index({
+  labPartnerId: 1,
+  "billingPeriod.startDate": 1,
+  "billingPeriod.endDate": 1,
+});
 platformInvoiceSchema.index({ status: 1, dueDate: 1 });
 
-// Virtual for formatted invoice number
-platformInvoiceSchema.virtual("formattedInvoiceNumber").get(function () {
-  return `INV-${this.billingPeriod.year}-${String(this.billingPeriod.month).padStart(2, "0")}-${this.invoiceNumber.slice(-6)}`;
-});
-
-// Virtual for formatted billing period
+// Virtual: formatted billing period
 platformInvoiceSchema.virtual("formattedBillingPeriod").get(function () {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
   return `${months[this.billingPeriod.month - 1]} ${this.billingPeriod.year}`;
 });
 
-// Method to check if invoice is overdue
+// Method: check if invoice is overdue
 platformInvoiceSchema.methods.isOverdue = function () {
-  return this.status === "payment_due" && new Date() > this.dueDate;
+  const overdueStatuses = [INVOICE_STATUSES.ISSUED, "payment_due"];
+  return overdueStatuses.includes(this.status) && new Date() > this.dueDate;
 };
 
-// Static method to generate invoice number
-platformInvoiceSchema.statics.generateInvoiceNumber = async function (labPartnerId, year, month) {
-  const prefix = `${year}${String(month).padStart(2, "0")}`;
-  const count = await this.countDocuments({
-    "billingPeriod.year": year,
-    "billingPeriod.month": month,
-  });
-  const sequence = String(count + 1).padStart(4, "0");
-  return `${prefix}${labPartnerId.toString().slice(-4)}${sequence}`;
+// Method: check if still in grace period
+platformInvoiceSchema.methods.isInGracePeriod = function () {
+  if (!this.gracePeriodEnd) return false;
+  const now = new Date();
+  return now > this.dueDate && now <= this.gracePeriodEnd;
 };
 
-// Pre-save hook to update overdue status
+// Pre-save hook: auto-update overdue status
 platformInvoiceSchema.pre("save", function (next) {
-  if (this.status === "payment_due" && new Date() > this.dueDate) {
-    this.status = "overdue";
+  const activeStatuses = [INVOICE_STATUSES.ISSUED, "payment_due"];
+  if (activeStatuses.includes(this.status) && new Date() > this.dueDate) {
+    this.status = INVOICE_STATUSES.OVERDUE;
   }
   next();
 });
 
-export const PlatformInvoice = mongoose.model("PlatformInvoice", platformInvoiceSchema);
+export const PlatformInvoice = mongoose.model(
+  "PlatformInvoice",
+  platformInvoiceSchema
+);

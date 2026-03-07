@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { useRazorpayPayment } from '../../../hooks/useRazorpayPayment';
 
 const LabBookingModal = ({ labPartner, onClose, onBookingSuccess }) => {
   const [tests, setTests] = useState([]);
@@ -10,6 +11,9 @@ const LabBookingModal = ({ labPartner, onClose, onBookingSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetchingTests, setFetchingTests] = useState(true);
+  const [paymentStep, setPaymentStep] = useState(null); // null | 'paying' | 'success' | 'failed'
+
+  const { initiatePayment, error: paymentError, reset: resetPayment } = useRazorpayPayment();
 
   // Available time slots
   const timeSlots = [
@@ -113,8 +117,33 @@ const LabBookingModal = ({ labPartner, onClose, onBookingSuccess }) => {
       const data = await response.json();
 
       if (data.success) {
-        onBookingSuccess(data.data);
-        onClose();
+        const bookingResult = data.data;
+        const paymentData = bookingResult.payment;
+
+        // If Razorpay order was created, initiate payment
+        if (paymentData?.razorpayOrderId) {
+          setPaymentStep('paying');
+          try {
+            await initiatePayment({
+              bookingId: bookingResult.booking?._id || bookingResult._id,
+              razorpayOrderId: paymentData.razorpayOrderId,
+              razorpayKeyId: paymentData.razorpayKeyId,
+              amount: paymentData.amount,
+              description: `Lab Tests at ${labPartner.laboratoryName}`,
+            });
+            setPaymentStep('success');
+            onBookingSuccess(bookingResult.booking || bookingResult);
+            // Brief delay so user sees success before modal closes
+            setTimeout(() => onClose(), 1500);
+          } catch (payErr) {
+            setPaymentStep('failed');
+            setError(payErr.message || 'Payment failed. You can retry from My Bookings.');
+          }
+        } else {
+          // No Razorpay order (Razorpay not configured) — booking created without payment
+          onBookingSuccess(bookingResult.booking || bookingResult);
+          onClose();
+        }
       } else {
         setError(data.message || 'Failed to create booking');
       }
@@ -155,9 +184,18 @@ const LabBookingModal = ({ labPartner, onClose, onBookingSuccess }) => {
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6">
-          {error && (
+          {(error || paymentError) && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-              {error}
+              {error || paymentError}
+            </div>
+          )}
+
+          {paymentStep === 'success' && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Payment successful! Redirecting...
             </div>
           )}
 
@@ -300,10 +338,19 @@ const LabBookingModal = ({ labPartner, onClose, onBookingSuccess }) => {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || selectedTests.length === 0}
-                  className="flex-1 px-6 py-3 bg-[#3f8554] hover:bg-[#225533] text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || paymentStep === 'paying' || paymentStep === 'success' || selectedTests.length === 0}
+                  className={`flex-1 px-6 py-3 font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    paymentStep === 'success'
+                      ? 'bg-green-600 text-white'
+                      : paymentStep === 'failed'
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-[#3f8554] hover:bg-[#225533] text-white'
+                  }`}
                 >
-                  {loading ? 'Booking...' : 'Confirm Booking'}
+                  {paymentStep === 'paying' && 'Processing Payment...'}
+                  {paymentStep === 'success' && 'Payment Successful!'}
+                  {paymentStep === 'failed' && `Retry Payment - ₹${calculateTotal()}`}
+                  {!paymentStep && (loading ? 'Creating Order...' : `Pay Now - ₹${calculateTotal()}`)}
                 </button>
               </div>
             </>

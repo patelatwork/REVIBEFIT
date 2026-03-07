@@ -676,6 +676,33 @@ router.post("/invoices/enforce-overdue", enforceOverdueInvoices);
  */
 router.get("/invoices/grace-period-status", getGracePeriodStatus);
 
+// Invoice PDF download
+router.get("/invoices/:invoiceId/download-pdf", async (req, res, next) => {
+  try {
+    const { PlatformInvoice } = await import("../models/platformInvoice.model.js");
+    const path = await import("path");
+    const fs = await import("fs");
+    const { fileURLToPath } = await import("url");
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+
+    const invoice = await PlatformInvoice.findById(req.params.invoiceId);
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found" });
+    }
+    if (!invoice.pdfPath) {
+      return res.status(404).json({ success: false, message: "PDF not yet generated" });
+    }
+    const filePath = path.join(__dirname, "../../public", invoice.pdfPath);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: "PDF file not found" });
+    }
+    res.download(filePath, `${invoice.invoiceNumber.replace(/\//g, "-")}.pdf`);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ─── Manager Management (Admin-only) ─────────────────────
 
 router.post("/managers", upload.single("profilePhoto"), createManager);

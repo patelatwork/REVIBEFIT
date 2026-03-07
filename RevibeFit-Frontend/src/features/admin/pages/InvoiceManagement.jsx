@@ -54,7 +54,6 @@ const InvoiceManagement = () => {
       );
 
       const data = await response.json();
-      console.log('Admin invoices response:', data);
       if (data.success) {
         setInvoices(data.data || []);
       } else {
@@ -164,7 +163,6 @@ const InvoiceManagement = () => {
       );
 
       const data = await response.json();
-      console.log('Invoice generation response:', data);
       if (data.success) {
         const summary = data.data.summary;
         alert(
@@ -178,7 +176,6 @@ const InvoiceManagement = () => {
         fetchInvoices();
         fetchGracePeriodStatus();
       } else {
-        console.error('Invoice generation failed:', data);
         setError(data.message || 'Failed to generate invoices');
         alert('Error: ' + (data.message || 'Failed to generate invoices'));
       }
@@ -413,7 +410,7 @@ const InvoiceManagement = () => {
 
   const filteredInvoices = invoices.filter(invoice => {
     if (filterStatus === 'all') return true;
-    if (filterStatus === 'pending') return invoice.status === 'payment_due' || invoice.status === 'overdue';
+    if (filterStatus === 'pending') return invoice.status === 'issued' || invoice.status === 'overdue';
     if (filterStatus === 'paid') return invoice.status === 'paid';
     if (filterStatus === 'overdue') return invoice.status === 'overdue' || new Date(invoice.dueDate) < new Date();
     return true;
@@ -518,7 +515,7 @@ const InvoiceManagement = () => {
                 : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
             >
-              Pending ({invoices.filter(i => i.status === 'payment_due' || i.status === 'overdue').length})
+              Pending ({invoices.filter(i => i.status === 'issued' || i.status === 'overdue').length})
             </button>
             <button
               onClick={() => setFilterStatus('paid')}
@@ -607,6 +604,39 @@ const InvoiceManagement = () => {
                         </div>
                       </div>
 
+                      {invoice.gstDetails && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-xs text-blue-800 font-semibold mb-1">GST Details</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-blue-700">Tax Type:</span>
+                              <span className="ml-2 font-semibold capitalize">{invoice.gstDetails.taxType === 'intra-state' ? 'Intra-State' : 'Inter-State'}</span>
+                            </div>
+                            <div>
+                              {invoice.gstDetails.taxType === 'intra-state' ? (
+                                <span className="font-semibold">CGST {formatCurrency(invoice.gstDetails.cgst || 0)} + SGST {formatCurrency(invoice.gstDetails.sgst || 0)}</span>
+                              ) : (
+                                <span className="font-semibold">IGST {formatCurrency(invoice.gstDetails.igst || 0)}</span>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-blue-700">Total Tax:</span>
+                              <span className="ml-2 font-semibold">{formatCurrency(invoice.gstDetails.totalTax || 0)}</span>
+                            </div>
+                            <div>
+                              <span className="text-blue-700">Invoice Total:</span>
+                              <span className="ml-2 font-semibold">{formatCurrency(invoice.totalCommission + (invoice.gstDetails.totalTax || 0))}</span>
+                            </div>
+                          </div>
+                          {invoice.totalSettlementAmount != null && (
+                            <div className="mt-2 text-xs">
+                              <span className="text-blue-700">Net Settlement:</span>
+                              <span className="ml-2 font-bold text-blue-900">{formatCurrency(invoice.totalSettlementAmount)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {invoice.status === 'paid' && invoice.paidDate && (
                         <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
                           <p className="text-xs text-green-800 font-semibold mb-1">Payment Received</p>
@@ -643,6 +673,17 @@ const InvoiceManagement = () => {
                         >
                           Mark as Paid
                         </button>
+                      )}
+
+                      {invoice.pdfPath && (
+                        <a
+                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/admin/invoices/${invoice._id}/download-pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-block px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-semibold"
+                        >
+                          Download PDF
+                        </a>
                       )}
                     </div>
                   </div>

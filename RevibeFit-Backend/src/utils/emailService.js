@@ -519,3 +519,61 @@ export const sendRequestMoreInfoEmail = async (user, message) => {
     return { success: false, error: error.message };
   }
 };
+
+// Generic notification email (used by notificationService)
+export const sendNotificationEmail = async (email, name, title, message, data = {}) => {
+  try {
+    if (!config.email.host || !config.email.user || !config.email.pass) {
+      console.log('Email configuration not found, skipping notification email');
+      return { success: true, skipped: true };
+    }
+
+    const transporter = createTransporter();
+    const amountStr = data.amount ? `₹${Number(data.amount).toLocaleString('en-IN')}` : '';
+
+    const mailOptions = {
+      from: `"${config.email.fromName}" <${config.email.from || config.email.user}>`,
+      to: email,
+      subject: `RevibeFit — ${title}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; }
+            .amount { font-size: 24px; font-weight: bold; color: #2563eb; }
+            .footer { text-align: center; padding: 16px; color: #6b7280; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2 style="margin:0;">RevibeFit</h2>
+            </div>
+            <div class="content">
+              <p>Hi ${name || 'there'},</p>
+              <h3>${title}</h3>
+              <p>${message}</p>
+              ${amountStr ? `<p class="amount">${amountStr}</p>` : ''}
+              ${data.invoiceNumber ? `<p><strong>Invoice:</strong> ${data.invoiceNumber}</p>` : ''}
+              ${data.dueDate ? `<p><strong>Due Date:</strong> ${new Date(data.dueDate).toLocaleDateString('en-IN')}</p>` : ''}
+            </div>
+            <div class="footer">
+              <p>This is an automated notification from RevibeFit.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending notification email:', error.message);
+    return { success: false, error: error.message };
+  }
+};

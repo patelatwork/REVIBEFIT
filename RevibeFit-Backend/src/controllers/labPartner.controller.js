@@ -1,11 +1,16 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { STATUS_CODES, USER_TYPES } from "../constants.js";
+import { STATUS_CODES, USER_TYPES, BOOKING_STATUSES, SETTLEMENT_STATUSES } from "../constants.js";
 import { User } from "../models/user.model.js";
 import { LabTest } from "../models/labTest.model.js";
 import { LabBooking } from "../models/labBooking.model.js";
 import { PlatformInvoice } from "../models/platformInvoice.model.js";
+import { Payment } from "../models/payment.model.js";
+import { Settlement } from "../models/settlement.model.js";
+import { calculateBookingFinancials } from "../utils/gstCalculator.js";
+import razorpayService from "../utils/razorpayService.js";
+import config from "../config/index.js";
 import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
@@ -334,6 +339,61 @@ const createBooking = asyncHandler(async (req, res) => {
     paymentStatus: "pending",
   });
 
+  // Create Razorpay order for platform-mediated payment
+  let razorpayOrderData = null;
+  try {
+    const commissionRate = labPartner.commissionRate || config.platform.commissionDefault;
+    const financials = calculateBookingFinancials(
+      totalAmount,
+      commissionRate,
+      labPartner.placeOfSupply || labPartner.state
+    );
+
+    const amountInPaise = Math.round(totalAmount * 100);
+    const labSettlementInPaise = Math.round(financials.netSettlement * 100);
+
+    const razorpayOrder = await razorpayService.createOrder({
+      amount: amountInPaise,
+      receipt: booking._id.toString(),
+      labLinkedAccountId: labPartner.razorpayLinkedAccountId,
+      labSettlementAmount: labSettlementInPaise,
+      notes: {
+        bookingId: booking._id.toString(),
+        labPartnerId: labPartner._id.toString(),
+        fitnessEnthusiastId: fitnessEnthusiastId.toString(),
+      },
+    });
+
+    // Create Payment document
+    const payment = await Payment.create({
+      bookingId: booking._id,
+      fitnessEnthusiastId,
+      labPartnerId: labPartner._id,
+      razorpayOrderId: razorpayOrder.id,
+      amount: amountInPaise,
+      currency: "INR",
+      status: "created",
+      commissionAmount: financials.commissionAmount,
+      gstOnCommission: financials.gstBreakdown.totalTax,
+      labSettlementAmount: financials.netSettlement,
+    });
+
+    // Update booking with Razorpay references
+    booking.razorpayOrderId = razorpayOrder.id;
+    booking.paymentId = payment._id;
+    await booking.save();
+
+    razorpayOrderData = {
+      razorpayOrderId: razorpayOrder.id,
+      razorpayKeyId: config.razorpay.keyId,
+      amount: amountInPaise,
+      currency: "INR",
+    };
+  } catch (error) {
+    console.error("Razorpay order creation failed:", error.message);
+    // Booking is still created — payment can be initiated separately via /api/payments/create-order
+  }
+
   // Populate the booking with user and test details
   const populatedBooking = await LabBooking.findById(booking._id)
     .populate("fitnessEnthusiastId", "name email phone")
@@ -345,7 +405,10 @@ const createBooking = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         STATUS_CODES.CREATED,
-        populatedBooking,
+        {
+          booking: populatedBooking,
+          payment: razorpayOrderData,
+        },
         "Booking created successfully"
       )
     );
@@ -430,8 +493,9 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
   const { status, expectedReportDeliveryTime } = req.body;
   const labPartnerId = req.user._id;
 
-  if (!["pending", "confirmed", "completed", "cancelled"].includes(status)) {
-    throw new ApiError(STATUS_CODES.BAD_REQUEST, "Invalid status");
+  const validStatuses = Object.values(BOOKING_STATUSES);
+  if (!validStatuses.includes(status)) {
+    throw new ApiError(STATUS_CODES.BAD_REQUEST, `Invalid status. Must be one of: ${validStatuses.join(", ")}`);
   }
 
   const booking = await LabBooking.findOne({
@@ -446,14 +510,79 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
     );
   }
 
+  const previousStatus = booking.status;
   booking.status = status;
-  
+
   // Update expected report delivery time if provided
   if (expectedReportDeliveryTime !== undefined) {
     booking.expectedReportDeliveryTime = expectedReportDeliveryTime;
   }
-  
+
   await booking.save();
+
+  // When booking is completed, release the payment hold and create settlement
+  if (status === BOOKING_STATUSES.COMPLETED && previousStatus !== BOOKING_STATUSES.COMPLETED) {
+    try {
+      const payment = await Payment.findOne({
+        bookingId: booking._id,
+        status: "captured",
+      });
+
+      if (payment && payment.transferId) {
+        // Release the held transfer to lab partner
+        await razorpayService.releaseTransfer(payment.razorpayPaymentId, payment.transferId);
+        payment.transferStatus = "released";
+        await payment.save();
+
+        // Fetch lab partner for GST calculation
+        const labPartner = await User.findById(labPartnerId);
+        const commissionRate = labPartner?.commissionRate || config.platform.commissionDefault;
+        const financials = calculateBookingFinancials(
+          booking.totalAmount,
+          commissionRate,
+          labPartner?.placeOfSupply || labPartner?.state
+        );
+
+        const now = new Date();
+        // Create settlement record
+        const settlement = await Settlement.create({
+          bookingId: booking._id,
+          paymentId: payment._id,
+          labPartnerId,
+          razorpayTransferId: payment.transferId,
+          grossAmount: booking.totalAmount,
+          commissionAmount: financials.commissionAmount,
+          commissionRate,
+          gstOnCommission: financials.gstBreakdown.totalTax,
+          gstBreakdown: {
+            type: financials.gstBreakdown.type,
+            cgstRate: financials.gstBreakdown.cgstRate,
+            cgstAmount: financials.gstBreakdown.cgst,
+            sgstRate: financials.gstBreakdown.sgstRate,
+            sgstAmount: financials.gstBreakdown.sgst,
+            igstRate: financials.gstBreakdown.igstRate,
+            igstAmount: financials.gstBreakdown.igst,
+          },
+          netSettlementAmount: financials.netSettlement,
+          status: SETTLEMENT_STATUSES.HOLD_RELEASED,
+          releasedAt: now,
+          billingPeriod: {
+            month: now.getMonth() + 1,
+            year: now.getFullYear(),
+          },
+        });
+
+        // Update booking with settlement reference
+        booking.settlementId = settlement._id;
+        booking.commissionAmount = financials.commissionAmount;
+        booking.commissionStatus = "paid";
+        await booking.save();
+      }
+    } catch (error) {
+      console.error("Settlement creation failed for booking", bookingId, ":", error.message);
+      // Non-fatal: the reconciliation cron will catch this
+    }
+  }
 
   const populatedBooking = await LabBooking.findById(booking._id)
     .populate("fitnessEnthusiastId", "name email phone")
@@ -763,111 +892,7 @@ const getBookingReport = asyncHandler(async (req, res) => {
     );
 });
 
-// @desc    Mark user payment as received (fitness enthusiast paid lab)
-// @route   PATCH /api/lab-partners/bookings/:bookingId/user-payment-received
-// @access  Private (Lab Partner)
-const markUserPaymentReceived = asyncHandler(async (req, res) => {
-  const { bookingId } = req.params;
-  const { paymentMethod } = req.body;
-  const labPartnerId = req.user._id;
-
-  // Find the booking and verify it belongs to this lab partner
-  const booking = await LabBooking.findOne({
-    _id: bookingId,
-    labPartnerId,
-  });
-
-  if (!booking) {
-    throw new ApiError(
-      STATUS_CODES.NOT_FOUND,
-      "Booking not found or you don't have permission"
-    );
-  }
-
-  // Check if user payment already marked as received
-  if (booking.userPaidToLab) {
-    throw new ApiError(
-      STATUS_CODES.BAD_REQUEST,
-      "User payment already marked as received for this booking"
-    );
-  }
-
-  // Validate payment method if provided
-  const validPaymentMethods = ["cash", "card", "online", "upi"];
-  if (paymentMethod && !validPaymentMethods.includes(paymentMethod)) {
-    throw new ApiError(
-      STATUS_CODES.BAD_REQUEST,
-      `Invalid payment method. Valid options: ${validPaymentMethods.join(", ")}`
-    );
-  }
-
-  // Get lab partner to access commission rate
-  const labPartner = await User.findById(labPartnerId);
-  if (!labPartner) {
-    throw new ApiError(STATUS_CODES.NOT_FOUND, "Lab partner not found");
-  }
-
-  // Calculate commission (default 10% of booking price)
-  const bookingPrice = booking.totalAmount;
-  const commissionRate = labPartner.commissionRate || 10;
-  const commissionAmount = (bookingPrice * commissionRate) / 100;
-
-  // Update booking with user payment information AND commission tracking
-  booking.userPaidToLab = true;
-  booking.userPaymentDate = new Date();
-  booking.userPaymentMethod = paymentMethod || null;
-  booking.userPaymentVerifiedBy = req.user.email;
-  booking.paymentStatus = "paid"; // Update overall payment status
-  
-  // Automatically track commission (lab receives full amount, but owes commission to platform)
-  booking.paymentReceivedByLab = true;
-  booking.paymentReceivedDate = new Date();
-  booking.commissionAmount = commissionAmount;
-  booking.commissionStatus = "pending"; // Will be billed at end of month
-  
-  await booking.save();
-
-  // Update lab partner financial tracking
-  labPartner.unbilledCommissions += commissionAmount;
-  labPartner.currentMonthLiability += commissionAmount;
-  labPartner.totalEarnings += bookingPrice;
-  labPartner.monthlyEarnings += bookingPrice;
-  labPartner.lastEarningsUpdate = new Date();
-  
-  await labPartner.save();
-
-  // Populate booking for response
-  const populatedBooking = await LabBooking.findById(booking._id)
-    .populate("fitnessEnthusiastId", "name email phone")
-    .populate("labPartnerId", "name laboratoryName unbilledCommissions currentMonthLiability")
-    .populate("selectedTests.testId", "testName");
-
-  return res
-    .status(STATUS_CODES.SUCCESS)
-    .json(
-      new ApiResponse(
-        STATUS_CODES.SUCCESS,
-        {
-          booking: populatedBooking,
-          userPayment: {
-            userPaidToLab: true,
-            userPaymentDate: booking.userPaymentDate,
-            userPaymentMethod: booking.userPaymentMethod,
-            paymentStatus: "paid",
-          },
-          revenue: {
-            bookingPrice,
-            labCash: bookingPrice,
-            commissionAmount,
-            commissionRate,
-            unbilledCommissions: labPartner.unbilledCommissions,
-            currentMonthLiability: labPartner.currentMonthLiability,
-          },
-        },
-        "User payment received and commission tracked successfully"
-      )
-    );
-});
+// markUserPaymentReceived - REMOVED: P2P payment flow replaced by Razorpay platform-mediated payments
 
 // @desc    Get all invoices for the authenticated lab partner
 // @route   GET /api/lab-partners/invoices
@@ -927,74 +952,62 @@ const getInvoiceById = asyncHandler(async (req, res) => {
     );
 });
 
-// @desc    Get financial summary for lab partner dashboard
+// @desc    Get financial summary for lab partner dashboard (settlement-based)
 // @route   GET /api/lab-partners/financial-summary
 // @access  Private (Lab Partner)
 const getFinancialSummary = asyncHandler(async (req, res) => {
   const labPartnerId = req.user._id;
 
-  // Get lab partner data
   const labPartner = await User.findById(labPartnerId).select(
-    "unbilledCommissions currentMonthLiability totalEarnings monthlyEarnings commissionRate"
+    "commissionRate totalEarnings monthlyEarnings"
   );
 
   if (!labPartner) {
     throw new ApiError(STATUS_CODES.NOT_FOUND, "Lab partner not found");
   }
 
-  // Get current month's stats
   const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-  const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const labPartnerObjId = new mongoose.Types.ObjectId(labPartnerId);
 
-  // Count pending commissions (payments received but not yet billed)
-  const pendingCommissionsData = await LabBooking.aggregate([
-    {
-      $match: {
-        labPartnerId: new mongoose.Types.ObjectId(labPartnerId),
-        paymentReceivedByLab: true,
-        commissionStatus: "pending",
+  // Aggregate settlement data
+  const [totalSettled, monthSettled, pendingSettlements] = await Promise.all([
+    // Total settled to lab all time
+    Settlement.aggregate([
+      { $match: { labPartnerId: labPartnerObjId, status: SETTLEMENT_STATUSES.SETTLED } },
+      { $group: { _id: null, total: { $sum: "$netSettlementAmount" }, count: { $sum: 1 } } },
+    ]),
+    // This month's settlements
+    Settlement.aggregate([
+      {
+        $match: {
+          labPartnerId: labPartnerObjId,
+          status: SETTLEMENT_STATUSES.SETTLED,
+          settledAt: { $gte: startOfMonth },
+        },
       },
-    },
-    {
-      $group: {
-        _id: null,
-        totalCommission: { $sum: "$commissionAmount" },
-        count: { $sum: 1 },
+      { $group: { _id: null, total: { $sum: "$netSettlementAmount" }, count: { $sum: 1 } } },
+    ]),
+    // Pending settlements (hold released but not yet settled)
+    Settlement.aggregate([
+      {
+        $match: {
+          labPartnerId: labPartnerObjId,
+          status: { $in: [SETTLEMENT_STATUSES.PENDING, SETTLEMENT_STATUSES.HOLD_RELEASED, SETTLEMENT_STATUSES.PROCESSING] },
+        },
       },
-    },
+      { $group: { _id: null, total: { $sum: "$netSettlementAmount" }, count: { $sum: 1 } } },
+    ]),
   ]);
 
-  const pendingCommissions = pendingCommissionsData[0] || { totalCommission: 0, count: 0 };
+  const totalEarned = totalSettled[0]?.total || 0;
+  const monthEarned = monthSettled[0]?.total || 0;
+  const pendingAmount = pendingSettlements[0]?.total || 0;
+  const pendingCount = pendingSettlements[0]?.count || 0;
 
-  // Get invoice statistics
-  const invoiceStats = await PlatformInvoice.aggregate([
-    {
-      $match: {
-        labPartnerId: new mongoose.Types.ObjectId(labPartnerId),
-      },
-    },
-    {
-      $group: {
-        _id: "$status",
-        total: { $sum: "$totalCommission" },
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-
-  const invoiceSummary = {
-    payment_due: { total: 0, count: 0 },
-    paid: { total: 0, count: 0 },
-    overdue: { total: 0, count: 0 },
-  };
-
-  invoiceStats.forEach((stat) => {
-    if (invoiceSummary[stat._id]) {
-      invoiceSummary[stat._id] = { total: stat.total, count: stat.count };
-    }
-  });
+  // Estimate next payout (Razorpay Route settles T+2 business days)
+  const nextPayoutDate = new Date();
+  nextPayoutDate.setDate(nextPayoutDate.getDate() + 3); // Rough T+2
 
   return res
     .status(STATUS_CODES.SUCCESS)
@@ -1002,23 +1015,53 @@ const getFinancialSummary = asyncHandler(async (req, res) => {
       new ApiResponse(
         STATUS_CODES.SUCCESS,
         {
-          currentBalance: {
-            totalEarnings: labPartner.totalEarnings,
-            monthlyEarnings: labPartner.monthlyEarnings,
-            unbilledCommissions: labPartner.unbilledCommissions,
-            currentMonthLiability: labPartner.currentMonthLiability,
-            netMonthlyRevenue: labPartner.monthlyEarnings - labPartner.currentMonthLiability,
+          totalEarned,
+          thisMonthEarned: monthEarned,
+          pendingPayout: {
+            amount: pendingAmount,
+            bookingsCount: pendingCount,
+            estimatedDate: pendingCount > 0 ? nextPayoutDate : null,
           },
-          pendingCommissions: {
-            amount: pendingCommissions.totalCommission,
-            bookingsCount: pendingCommissions.count,
-          },
-          invoices: invoiceSummary,
           commissionRate: labPartner.commissionRate,
         },
         "Financial summary fetched successfully"
       )
     );
+});
+
+// @desc    Get settlements for the authenticated lab partner
+// @route   GET /api/lab-partners/settlements
+// @access  Private (Lab Partner)
+const getMySettlements = asyncHandler(async (req, res) => {
+  const labPartnerId = req.user._id;
+  const { status, month, year, page = 1, limit = 20 } = req.query;
+
+  const query = { labPartnerId };
+  if (status) query.status = status;
+  if (month) query["billingPeriod.month"] = parseInt(month);
+  if (year) query["billingPeriod.year"] = parseInt(year);
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [settlements, total] = await Promise.all([
+    Settlement.find(query)
+      .populate("bookingId", "selectedTests bookingDate totalAmount status")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit)),
+    Settlement.countDocuments(query),
+  ]);
+
+  return res.status(STATUS_CODES.SUCCESS).json(
+    new ApiResponse(STATUS_CODES.SUCCESS, {
+      settlements,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    }, "Settlements fetched successfully")
+  );
 });
 
 // @desc    Request invoice generation from admin
@@ -1153,10 +1196,11 @@ export {
   uploadReport,
   deleteReport,
   getBookingReport,
-  markUserPaymentReceived,
+
   getMyInvoices,
   getInvoiceById,
   getFinancialSummary,
+  getMySettlements,
   requestInvoice,
   updateLabPartnerProfile,
 };

@@ -64,6 +64,12 @@ app.use((req, res, next) => {
 // HTTP Parameter Pollution protection
 app.use(hpp());
 
+// ─── Razorpay Webhook (raw body for signature verification) ─────────────────
+// Must be BEFORE express.json() so the raw body is preserved
+
+import webhookRoutes from "./routes/webhook.routes.js";
+app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
+
 // ─── Body Parsing ───────────────────────────────────────────────────────────
 
 app.use(express.json({ limit: "16kb" }));
@@ -105,6 +111,8 @@ import liveClassRoutes from "./routes/liveClass.routes.js";
 import nutritionRoutes from "./routes/nutrition.routes.js";
 import managerRoutes from "./routes/manager.routes.js";
 import communityRoutes from "./routes/community.routes.js";
+import paymentRoutes from "./routes/payment.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 // ─── Route Declarations ─────────────────────────────────────────────────────
 
@@ -118,6 +126,8 @@ app.use("/api/classes", liveClassRoutes);
 app.use("/api/manager", managerRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/community", communityRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ─── API Documentation (Swagger UI) ────────────────────────────────────────
 

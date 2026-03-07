@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRazorpayPayment } from '../../../hooks/useRazorpayPayment';
 
 const MyBookings = () => {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refundingId, setRefundingId] = useState(null);
+  const { initiatePayment, createOrder } = useRazorpayPayment();
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -71,12 +74,66 @@ const MyBookings = () => {
     }
   };
 
+  const handleRefund = async (bookingId) => {
+    if (!confirm('Are you sure you want to request a refund for this booking?')) return;
+    setRefundingId(bookingId);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/payments/${bookingId}/refund`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        fetchBookings();
+      } else {
+        setError(data.message || 'Failed to request refund');
+      }
+    } catch (err) {
+      console.error('Error requesting refund:', err);
+      setError('Failed to request refund');
+    } finally {
+      setRefundingId(null);
+    }
+  };
+
+  const handleRetryPayment = async (booking) => {
+    try {
+      if (booking.razorpayOrderId) {
+        await initiatePayment({
+          bookingId: booking._id,
+          razorpayOrderId: booking.razorpayOrderId,
+          razorpayKeyId: import.meta.env.VITE_RAZORPAY_KEY_ID,
+          amount: booking.totalAmount * 100,
+          description: `Lab Tests at ${booking.labPartnerId?.laboratoryName}`,
+        });
+      } else {
+        const orderData = await createOrder(booking._id);
+        await initiatePayment({
+          bookingId: booking._id,
+          razorpayOrderId: orderData.razorpayOrderId,
+          razorpayKeyId: orderData.razorpayKeyId,
+          amount: orderData.amount,
+          description: `Lab Tests at ${booking.labPartnerId?.laboratoryName}`,
+        });
+      }
+      fetchBookings();
+    } catch (err) {
+      setError(err.message || 'Payment failed. Please try again.');
+    }
+  };
+
   const getStatusBadgeClass = (status) => {
     switch (status) {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
       case 'confirmed':
         return 'bg-blue-100 text-blue-800';
+      case 'sample-collected':
+        return 'bg-purple-100 text-purple-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'cancelled':
@@ -84,6 +141,24 @@ const MyBookings = () => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getPaymentStatusBadge = (status) => {
+    switch (status) {
+      case 'paid':
+      case 'captured':
+        return 'bg-green-100 text-green-700';
+      case 'refunded':
+        return 'bg-blue-100 text-blue-700';
+      case 'failed':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-yellow-100 text-yellow-700';
+    }
+  };
+
+  const formatStatusLabel = (status) => {
+    return status.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   };
 
   const formatDate = (dateString) => {
@@ -169,7 +244,7 @@ const MyBookings = () => {
                         booking.status
                       )}`}
                     >
-                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                      {formatStatusLabel(booking.status)}
                     </span>
                   </div>
 
@@ -327,32 +402,56 @@ const MyBookings = () => {
                   )}
 
                   {/* Payment Status */}
-                  <div className="mb-4">
-                    <span className="text-sm text-gray-600">Payment Status: </span>
+                  <div className="mb-4 flex items-center gap-3">
+                    <span className="text-sm text-gray-600">Payment: </span>
                     <span
-                      className={`text-sm font-semibold ${
-                        booking.paymentStatus === 'paid'
-                          ? 'text-green-600'
-                          : booking.paymentStatus === 'refunded'
-                          ? 'text-blue-600'
-                          : 'text-yellow-600'
-                      }`}
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusBadge(booking.paymentStatus)}`}
                     >
-                      {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
+                      {formatStatusLabel(booking.paymentStatus)}
                     </span>
+                    {booking.paymentStatus === 'paid' && booking.totalAmount && (
+                      <span className="text-sm text-green-700 font-medium">
+                        ₹{booking.totalAmount} paid via Razorpay
+                      </span>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
-                  {booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                    <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    {/* Retry Payment - for failed or pending payments */}
+                    {(booking.paymentStatus === 'pending' || booking.paymentStatus === 'failed') &&
+                      booking.status !== 'cancelled' && (
+                      <button
+                        onClick={() => handleRetryPayment(booking)}
+                        className="px-6 py-2 bg-[#3f8554] hover:bg-[#225533] text-white font-semibold rounded-lg transition-colors"
+                      >
+                        Pay Now - ₹{booking.totalAmount}
+                      </button>
+                    )}
+
+                    {/* Request Refund - only for paid bookings before sample collection */}
+                    {booking.paymentStatus === 'paid' &&
+                      !['sample-collected', 'completed', 'cancelled'].includes(booking.status) && (
+                      <button
+                        onClick={() => handleRefund(booking._id)}
+                        disabled={refundingId === booking._id}
+                        className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {refundingId === booking._id ? 'Processing...' : 'Request Refund'}
+                      </button>
+                    )}
+
+                    {/* Cancel Booking */}
+                    {booking.status !== 'cancelled' && booking.status !== 'completed' &&
+                      booking.status !== 'sample-collected' && (
                       <button
                         onClick={() => handleCancelBooking(booking._id)}
-                        className="flex-1 md:flex-none px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors"
+                        className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors"
                       >
                         Cancel Booking
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Booking ID */}
                   <div className="mt-4 pt-4 border-t border-gray-200">

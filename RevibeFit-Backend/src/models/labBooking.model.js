@@ -39,15 +39,30 @@ const labBookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "completed", "cancelled"],
+      enum: ["pending", "confirmed", "sample-collected", "completed", "cancelled"],
       default: "pending",
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "refunded"],
+      enum: ["pending", "paid", "refunded", "failed"],
       default: "pending",
     },
-    // User payment to Lab (fitness enthusiast pays lab directly)
+
+    // Platform-mediated payment (Razorpay)
+    razorpayOrderId: { type: String, index: true, sparse: true },
+    razorpayPaymentId: { type: String, index: true, sparse: true },
+    paymentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
+      default: null,
+    },
+    settlementId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Settlement",
+      default: null,
+    },
+
+    // @deprecated — P2P fields below kept for existing data. Use Payment model for new bookings.
     userPaidToLab: {
       type: Boolean,
       default: false,

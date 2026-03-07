@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, LogOut } from 'lucide-react';
 import logo from '../../../assets/exercise_8407005.png';
+import NotificationBell from '../../../components/NotificationBell';
 
 const links = [
   { to: '/classes', label: 'Classes' },
@@ -54,6 +55,7 @@ const FitnessEnthusiastNavbar = ({ userName }) => {
 
           {/* Desktop Right */}
           <div className="hidden md:flex items-center gap-3">
+            <NotificationBell />
             <span className="text-sm text-gray-600">
               Welcome, <span className="font-semibold text-[#3f8554]">{userName}</span>
             </span>

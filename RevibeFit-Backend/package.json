@@ -35,7 +35,10 @@
     "mongoose": "^8.19.2",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "nodemailer": "^6.9.8",
+    "pdfmake": "^0.3.5",
+    "razorpay": "^2.9.6",
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"

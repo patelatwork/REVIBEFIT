@@ -1,5 +1,10 @@
 import swaggerJsdoc from "swagger-jsdoc";
 import config from "./index.js";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const swaggerDefinition = {
   openapi: "3.0.0",
@@ -241,13 +246,16 @@ const swaggerDefinition = {
     { name: "Nutrition", description: "Nutrition profiles, meal plans & food search" },
     { name: "Lab Partners", description: "Lab partner listings, tests & bookings" },
     { name: "Workouts", description: "Workout completion tracking" },
+    { name: "Community", description: "Community posts, comments, follows & reactions" },
+    { name: "Community - Challenges", description: "Community challenges and leaderboards" },
+    { name: "Manager", description: "Manager/admin approvals, invoices and analytics" },
   ],
 };
 
 const options = {
   swaggerDefinition,
   // Path to the route files containing JSDoc annotations
-  apis: ["./src/routes/*.js"],
+  apis: [path.join(__dirname, "../routes/*.js")],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

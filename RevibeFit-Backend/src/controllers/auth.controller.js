@@ -126,7 +126,7 @@ const signup = asyncHandler(async (req, res) => {
     userData.fitnessGoal = fitnessGoal;
   } else if (userType === USER_TYPES.TRAINER) {
     userData.specialization = specialization;
-    userData.certifications = `temp/${req.files.certifications[0].filename}`;
+    userData.certifications = req.files.certifications[0].path;
     // Mandatory trainer fields
     if (!bio || bio.trim().length < 20) {
       throw new ApiError(STATUS_CODES.BAD_REQUEST, "Bio / Experience is required (minimum 20 characters)");
@@ -135,7 +135,7 @@ const signup = asyncHandler(async (req, res) => {
       throw new ApiError(STATUS_CODES.BAD_REQUEST, "Government ID is required for verification");
     }
     userData.bio = bio;
-    userData.governmentId = `temp/${req.files.governmentId[0].filename}`;
+    userData.governmentId = req.files.governmentId[0].path;
     // Parse social links (sent as JSON string from FormData)
     if (socialLinks) {
       try {
@@ -160,8 +160,8 @@ const signup = asyncHandler(async (req, res) => {
     if (!Object.values(parsedHours).some(h => h.isOpen)) {
       throw new ApiError(STATUS_CODES.BAD_REQUEST, "At least one operating day must be specified");
     }
-    userData.accreditationDocs = `temp/${req.files.accreditationDocs[0].filename}`;
-    userData.labImages = req.files.labImages.map(f => `temp/${f.filename}`);
+    userData.accreditationDocs = req.files.accreditationDocs[0].path;
+    userData.labImages = req.files.labImages.map(f => f.path);
     userData.operatingHours = parsedHours;
   }
 

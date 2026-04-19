@@ -20,12 +20,11 @@ export const createPost = asyncHandler(async (req, res) => {
   const { content, category, tags } = req.body;
   const userId = req.user._id;
 
-  // Handle image uploads (multiple)
+  // Handle image uploads (multiple) — Cloudinary URLs stored directly
   const images = [];
   if (req.files && req.files.length > 0) {
     for (const file of req.files) {
-      const filePath = file.path.split("public")[1] || file.path;
-      images.push(filePath.replace(/\\/g, "/").replace(/^\//, ""));
+      images.push(file.path); // Cloudinary URL
     }
   }
 

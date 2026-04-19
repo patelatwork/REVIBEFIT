@@ -206,7 +206,7 @@ const ManagerProfile = () => {
                                                 {photoPreview ? (
                                                     <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
                                                 ) : profile.profilePhoto ? (
-                                                    <img src={`http://localhost:8000/${profile.profilePhoto}`} alt="Profile" className="w-full h-full object-cover" />
+                                                    <img src={profile.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
                                                 ) : (
                                                     getInitials()
                                                 )}

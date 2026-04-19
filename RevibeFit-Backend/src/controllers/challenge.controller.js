@@ -40,8 +40,7 @@ export const createChallenge = asyncHandler(async (req, res) => {
   // Handle cover image
   let coverImage = null;
   if (req.file) {
-    const filePath = req.file.path.split("public")[1] || req.file.path;
-    coverImage = filePath.replace(/\\/g, "/").replace(/^\//, "");
+    coverImage = req.file.path; // Cloudinary URL
   }
 
   const challenge = await Challenge.create({

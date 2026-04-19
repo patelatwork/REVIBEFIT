@@ -132,6 +132,11 @@ const labBookingSchema = new mongoose.Schema(
       type: Date,
       // Timestamp when the report was uploaded
     },
+    cloudinaryPublicId: {
+      type: String,
+      default: null,
+      // Cloudinary public_id for the uploaded report — used to delete from Cloudinary
+    },
   },
   {
     timestamps: true,

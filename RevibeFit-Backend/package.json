@@ -6,6 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "cd src && nodemon index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "fix-invoice-index": "node scripts/drop-invoice-unique-index.js",
     "create-test-booking": "node scripts/create-test-booking.js"
   },
@@ -16,8 +19,10 @@
   "author": "RevibeFit",
   "license": "ISC",
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.4",
     "nodemon": "^3.1.10",
-    "prettier": "^3.6.2"
+    "prettier": "^3.6.2",
+    "vitest": "^4.1.4"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -32,6 +37,7 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
+    "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.2",
     "morgan": "^1.10.0",

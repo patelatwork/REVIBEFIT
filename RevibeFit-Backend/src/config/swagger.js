@@ -19,8 +19,10 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: `http://localhost:${config.port}`,
-      description: "Development server",
+      url: config.isProduction
+        ? process.env.PRODUCTION_URL || `http://localhost:${config.port}`
+        : `http://localhost:${config.port}`,
+      description: config.isProduction ? "Production server" : "Development server",
     },
   ],
   components: {
@@ -36,6 +38,12 @@ const swaggerDefinition = {
         in: "cookie",
         name: "accessToken",
         description: "JWT stored in httpOnly cookie",
+      },
+      apiKeyAuth: {
+        type: "apiKey",
+        in: "header",
+        name: "X-API-KEY",
+        description: "B2B API Key for external service integrations",
       },
     },
     schemas: {
@@ -249,6 +257,8 @@ const swaggerDefinition = {
     { name: "Community", description: "Community posts, comments, follows & reactions" },
     { name: "Community - Challenges", description: "Community challenges and leaderboards" },
     { name: "Manager", description: "Manager/admin approvals, invoices and analytics" },
+    { name: "B2B - External", description: "B2B endpoints for external integrations (requires X-API-KEY header)" },
+    { name: "Search", description: "Full-text user search powered by Atlas Search" },
   ],
 };
 

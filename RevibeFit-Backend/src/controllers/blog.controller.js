@@ -6,6 +6,7 @@ import { BlogReading } from "../models/blogReading.model.js";
 import { User } from "../models/user.model.js";
 import { USER_TYPES } from "../constants.js";
 import path from "path";
+import { cacheGet, cacheSet, cacheDelete } from "../config/redis.js";
 
 /**
  * @desc    Create a new blog post
@@ -40,6 +41,8 @@ export const createBlog = asyncHandler(async (req, res) => {
     authorName: trainer.name,
   });
 
+  await cacheDelete("blogs:list:*");
+
   return res.status(201).json(
     new ApiResponse(201, blog, "Blog post created successfully")
   );
@@ -52,6 +55,14 @@ export const createBlog = asyncHandler(async (req, res) => {
  */
 export const getAllBlogs = asyncHandler(async (req, res) => {
   const { category } = req.query;
+  const cacheKey = `blogs:list:${category || "all"}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) {
+    const response = new ApiResponse(200, cached, "Blogs retrieved successfully");
+    response.fromCache = true;
+    return res.status(200).json(response);
+  }
 
   const filter = { isPublished: true };
   if (category) {
@@ -60,7 +71,10 @@ export const getAllBlogs = asyncHandler(async (req, res) => {
 
   const blogs = await Blog.find(filter)
     .populate("author", "name specialization")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
+
+  await cacheSet(cacheKey, blogs, 300);
 
   return res.status(200).json(
     new ApiResponse(200, blogs, "Blogs retrieved successfully")

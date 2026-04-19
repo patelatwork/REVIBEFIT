@@ -105,6 +105,8 @@ import liveClassRoutes from "./routes/liveClass.routes.js";
 import nutritionRoutes from "./routes/nutrition.routes.js";
 import managerRoutes from "./routes/manager.routes.js";
 import communityRoutes from "./routes/community.routes.js";
+import searchRoutes from "./routes/search.routes.js";
+import b2bRoutes from "./routes/b2b.routes.js";
 
 // ─── Route Declarations ─────────────────────────────────────────────────────
 
@@ -118,6 +120,8 @@ app.use("/api/classes", liveClassRoutes);
 app.use("/api/manager", managerRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/community", communityRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/b2b", b2bRoutes);
 
 // ─── API Documentation (Swagger UI) ────────────────────────────────────────
 
@@ -143,6 +147,20 @@ app.get("/health", (req, res) => {
     message: "Server is running",
     environment: config.nodeEnv,
   });
+});
+
+// ─── Cache Stats (for performance reporting) ────────────────────────────────
+
+app.get("/api/cache-stats", async (req, res) => {
+  try {
+    const { getRedisClient } = await import("./config/redis.js");
+    const client = getRedisClient();
+    const info = await client.info("stats");
+    const keyspace = await client.info("keyspace");
+    res.json({ success: true, data: { info, keyspace } });
+  } catch (err) {
+    res.status(503).json({ success: false, message: "Redis unavailable", error: err.message });
+  }
 });
 
 // ─── Error Handling ─────────────────────────────────────────────────────────

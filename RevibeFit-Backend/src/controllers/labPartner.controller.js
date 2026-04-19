@@ -9,6 +9,7 @@ import { PlatformInvoice } from "../models/platformInvoice.model.js";
 import mongoose from "mongoose";
 import { cloudinary } from "../middlewares/multer.middleware.js";
 import { escapeRegex } from "../middlewares/validate.middleware.js";
+import { cacheGet, cacheSet } from "../config/redis.js";
 
 // @desc    Get all approved lab partners
 // @route   GET /api/lab-partners
@@ -16,15 +17,25 @@ import { escapeRegex } from "../middlewares/validate.middleware.js";
 const getApprovedLabPartners = asyncHandler(async (req, res) => {
   const { search } = req.query;
 
+  const cacheKey = `labPartners:approved:${JSON.stringify(req.query)}`;
+
+  if (!search) {
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      const response = new ApiResponse(STATUS_CODES.SUCCESS, cached, "Lab partners fetched successfully");
+      response.fromCache = true;
+      return res.status(STATUS_CODES.SUCCESS).json(response);
+    }
+  }
+
   let query = {
     userType: USER_TYPES.LAB_PARTNER,
     isApproved: true,
     approvalStatus: "approved",
     isActive: true,
-    isSuspended: false, // Exclude suspended labs from public listing
+    isSuspended: false,
   };
 
-  // Add search functionality
   if (search) {
     const safeSearch = escapeRegex(search);
     query.$or = [
@@ -34,9 +45,13 @@ const getApprovedLabPartners = asyncHandler(async (req, res) => {
     ];
   }
 
-  const labPartners = await User.find(query).select(
-    "-password -refreshToken"
-  );
+  const labPartners = await User.find(query)
+    .select("-password -refreshToken")
+    .lean();
+
+  if (!search) {
+    await cacheSet(cacheKey, labPartners, 300);
+  }
 
   return res
     .status(STATUS_CODES.SUCCESS)

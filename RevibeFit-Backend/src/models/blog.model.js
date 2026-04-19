@@ -44,7 +44,8 @@ const blogSchema = new mongoose.Schema(
 
 // Index for better query performance
 blogSchema.index({ author: 1, createdAt: -1 });
-blogSchema.index({ category: 1 });
+blogSchema.index({ category: 1, createdAt: -1 });
 blogSchema.index({ isPublished: 1 });
+blogSchema.index({ tags: 1 });
 
 export const Blog = mongoose.model("Blog", blogSchema);

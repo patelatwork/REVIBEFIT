@@ -215,7 +215,8 @@ const Signup = () => {
         console.log('Form Data:', Object.fromEntries(submitData));
 
         // Make API call to backend
-        const response = await fetch('http://localhost:8000/api/auth/signup', {
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/auth/signup`, {
           method: 'POST',
           body: submitData,
         });

@@ -55,7 +55,8 @@ const Login = () => {
       setLoading(true);
       try {
         // Make API call to unified login endpoint
-        const response = await fetch('http://localhost:8000/api/auth/login', {
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

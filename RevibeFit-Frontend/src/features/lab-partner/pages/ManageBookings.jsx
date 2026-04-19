@@ -762,7 +762,7 @@ const ManageBookings = () => {
                       
                       <div className="flex gap-2">
                         <a
-                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${booking.reportUrl}`}
+                          href={booking.reportUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex-1 px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold rounded transition-colors text-center flex items-center justify-center gap-2"

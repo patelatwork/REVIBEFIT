@@ -27,9 +27,8 @@ export const createBlog = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Thumbnail image is required");
   }
 
-  // Get relative path for the thumbnail (remove absolute path, keep only public/temp/...)
-  const thumbnailPath = req.file.path.split('public')[1] || req.file.path;
-  const normalizedPath = thumbnailPath.replace(/\\/g, '/').replace(/^\//, '');
+  // Get Cloudinary URL for the thumbnail
+  const normalizedPath = req.file.path;
 
   // Create blog
   const blog = await Blog.create({
@@ -134,9 +133,7 @@ export const updateBlog = asyncHandler(async (req, res) => {
 
   // Update thumbnail if new file uploaded
   if (req.file) {
-    const thumbnailPath = req.file.path.split('public')[1] || req.file.path;
-    const normalizedPath = thumbnailPath.replace(/\\/g, '/').replace(/^\//, '');
-    blog.thumbnail = normalizedPath;
+    blog.thumbnail = req.file.path;
   }
 
   await blog.save();

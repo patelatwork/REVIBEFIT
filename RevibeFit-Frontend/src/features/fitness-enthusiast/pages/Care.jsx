@@ -353,7 +353,7 @@ const Care = () => {
                               </div>
                             </div>
                             <a
-                              href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${booking.reportUrl}`}
+                              href={booking.reportUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="block w-full px-4 py-3 bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold rounded transition-colors text-center flex items-center justify-center gap-2"

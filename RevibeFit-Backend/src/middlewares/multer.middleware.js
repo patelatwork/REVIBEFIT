@@ -1,26 +1,58 @@
 import multer from "multer";
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import config from "../config/index.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// ─── Configure Cloudinary ──────────────────────────────────────────────────
+cloudinary.config({
+  cloud_name: config.cloudinary.cloudName,
+  api_key: config.cloudinary.apiKey,
+  api_secret: config.cloudinary.apiSecret,
+});
 
-// Configure storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../../public/temp"));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
+// ─── Cloudinary Storage Engines ───────────────────────────────────────────
+
+// For images (thumbnails, profile photos, community posts)
+const imageStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "revibefit/images",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    resource_type: "image",
   },
 });
 
-// File filter for PDF only
+// For PDF documents (certifications, government IDs, accreditation docs, reports)
+const pdfStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "revibefit/documents",
+    allowed_formats: ["pdf"],
+    resource_type: "raw",
+  },
+});
+
+// For mixed uploads (trainer & lab partner signup — PDFs + images)
+const mixedStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    if (file.mimetype === "application/pdf") {
+      return {
+        folder: "revibefit/documents",
+        resource_type: "raw",
+        allowed_formats: ["pdf"],
+      };
+    }
+    return {
+      folder: "revibefit/images",
+      resource_type: "image",
+      allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    };
+  },
+});
+
+// ─── File Filters ──────────────────────────────────────────────────────────
+
 const pdfFileFilter = (req, file, cb) => {
   if (file.mimetype === "application/pdf") {
     cb(null, true);
@@ -29,7 +61,6 @@ const pdfFileFilter = (req, file, cb) => {
   }
 };
 
-// File filter for images only
 const imageFileFilter = (req, file, cb) => {
   const allowedMimeTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
   if (allowedMimeTypes.includes(file.mimetype)) {
@@ -39,7 +70,6 @@ const imageFileFilter = (req, file, cb) => {
   }
 };
 
-// File filter that allows both PDF and images (for signup with mixed uploads)
 const mixedFileFilter = (req, file, cb) => {
   const pdfMime = "application/pdf";
   const imageMimes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
@@ -50,21 +80,23 @@ const mixedFileFilter = (req, file, cb) => {
   }
 };
 
-// Upload middleware for PDF files (certifications, documents)
+// ─── Multer Upload Middlewares ─────────────────────────────────────────────
+
+// Upload middleware for PDF files (certifications, lab reports)
 export const upload = multer({
-  storage: storage,
+  storage: pdfStorage,
   fileFilter: pdfFileFilter,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB default
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024,
   },
 });
 
-// Upload middleware for image files (thumbnails)
+// Upload middleware for image files (thumbnails, profile photos)
 export const uploadImage = multer({
-  storage: storage,
+  storage: imageStorage,
   fileFilter: imageFileFilter,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB default
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024,
   },
 });
 
@@ -72,7 +104,7 @@ export const uploadImage = multer({
 //   Trainer:     certifications (PDF, required), governmentId (PDF/image, optional)
 //   Lab Partner: accreditationDocs (PDF, optional), labImages (images, optional, up to 5)
 export const uploadSignup = multer({
-  storage: storage,
+  storage: mixedStorage,
   fileFilter: mixedFileFilter,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024,
@@ -84,3 +116,5 @@ export const uploadSignup = multer({
   { name: "labImages", maxCount: 5 },
 ]);
 
+// Export cloudinary instance for direct use in controllers (e.g. deleting old files)
+export { cloudinary };

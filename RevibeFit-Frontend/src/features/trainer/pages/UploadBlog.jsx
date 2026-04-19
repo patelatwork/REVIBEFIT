@@ -207,7 +207,7 @@ const UploadBlog = () => {
       content: blog.content,
       category: blog.category,
     });
-    setThumbnailPreview(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/${blog.thumbnail.replace(/\\/g, '/')}`);
+    setThumbnailPreview(blog.thumbnail);
     
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -499,7 +499,7 @@ const UploadBlog = () => {
                 <div key={blog._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex gap-4">
                     <img 
-                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/${blog.thumbnail.replace(/\\/g, '/')}`}
+                      src={blog.thumbnail}
                       alt={blog.title}
                       className="w-32 h-32 object-cover rounded-lg"
                       onError={(e) => {

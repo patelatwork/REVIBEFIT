@@ -58,6 +58,13 @@ const config = {
     clientSecret: process.env.FATSECRET_CLIENT_SECRET,
   },
 
+  // Cloudinary
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  },
+
   // Rate Limiting (relaxed in development)
   rateLimit: {
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -82,6 +89,17 @@ export const validateConfig = () => {
     );
     console.error("Please check your .env file against .env.sample");
     process.exit(1);
+  }
+
+  // Warn (but don't crash) if Cloudinary is not configured
+  const cloudinaryVars = ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"];
+  const missingCloudinary = cloudinaryVars.filter(
+    (key) => !process.env[key] || process.env[key].startsWith("PASTE_YOUR") || process.env[key].startsWith("your_")
+  );
+  if (missingCloudinary.length > 0) {
+    console.warn("⚠️  Cloudinary not configured — file uploads will fail.");
+    console.warn("   Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in .env");
+    console.warn("   Get credentials from: https://cloudinary.com/console");
   }
 };
 

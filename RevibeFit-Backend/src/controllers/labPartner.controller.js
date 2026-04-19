@@ -7,8 +7,7 @@ import { LabTest } from "../models/labTest.model.js";
 import { LabBooking } from "../models/labBooking.model.js";
 import { PlatformInvoice } from "../models/platformInvoice.model.js";
 import mongoose from "mongoose";
-import fs from "fs";
-import path from "path";
+import { cloudinary } from "../middlewares/multer.middleware.js";
 import { escapeRegex } from "../middlewares/validate.middleware.js";
 
 // @desc    Get all approved lab partners
@@ -608,27 +607,27 @@ const uploadReport = asyncHandler(async (req, res) => {
   });
 
   if (!booking) {
-    // Delete uploaded file if booking not found
-    fs.unlinkSync(req.file.path);
+    // File is already on Cloudinary — destroy it to avoid orphaned files
+    if (req.file.filename) {
+      await cloudinary.uploader.destroy(req.file.filename, { resource_type: "raw" }).catch(() => {});
+    }
     throw new ApiError(
       STATUS_CODES.NOT_FOUND,
       "Booking not found or you don't have permission"
     );
   }
 
-  // Delete old report file if it exists
-  if (booking.reportUrl) {
-    const oldFilePath = path.join(process.cwd(), "public", booking.reportUrl);
-    if (fs.existsSync(oldFilePath)) {
-      fs.unlinkSync(oldFilePath);
-    }
+  // Delete old report from Cloudinary if it exists
+  if (booking.cloudinaryPublicId) {
+    await cloudinary.uploader.destroy(booking.cloudinaryPublicId, { resource_type: "raw" }).catch(() => {});
   }
 
-  // Save the report URL (relative path from public directory)
-  const reportUrl = `/temp/${req.file.filename}`;
-  booking.reportUrl = reportUrl;
+  // req.file.path = full Cloudinary HTTPS URL
+  // req.file.filename = Cloudinary public_id (e.g. "revibefit/documents/abc123")
+  booking.reportUrl = req.file.path;              // Cloudinary HTTPS URL
+  booking.cloudinaryPublicId = req.file.filename; // for future deletion
   booking.reportUploadedAt = new Date();
-  
+
   await booking.save();
 
   const populatedBooking = await LabBooking.findById(booking._id)
@@ -671,14 +670,14 @@ const deleteReport = asyncHandler(async (req, res) => {
     throw new ApiError(STATUS_CODES.BAD_REQUEST, "No report found for this booking");
   }
 
-  // Delete the file from storage
-  const filePath = path.join(process.cwd(), "public", booking.reportUrl);
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  // Delete the file from Cloudinary
+  if (booking.cloudinaryPublicId) {
+    await cloudinary.uploader.destroy(booking.cloudinaryPublicId, { resource_type: "raw" }).catch(() => {});
   }
 
   // Remove report information from booking
   booking.reportUrl = undefined;
+  booking.cloudinaryPublicId = undefined;
   booking.reportUploadedAt = undefined;
   await booking.save();
 

@@ -182,7 +182,7 @@ const LabReports = () => {
                 </div>
 
                 <div className="pt-4 border-t border-gray-200">
-                  {booking.report ? (
+                  {booking.reportUrl ? (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center text-green-600">
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -191,7 +191,7 @@ const LabReports = () => {
                         <span className="text-sm font-medium">Report uploaded</span>
                       </div>
                       <a
-                        href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${booking.report}`}
+                        href={booking.reportUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[#3f8554] hover:text-[#2d6b43] text-sm font-medium"

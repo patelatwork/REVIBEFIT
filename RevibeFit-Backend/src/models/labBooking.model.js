@@ -145,7 +145,9 @@ const labBookingSchema = new mongoose.Schema(
 
 // Indexes for faster queries
 labBookingSchema.index({ fitnessEnthusiastId: 1, status: 1 });
+labBookingSchema.index({ labPartnerId: 1, status: 1 });
 labBookingSchema.index({ labPartnerId: 1, bookingDate: 1 });
 labBookingSchema.index({ status: 1 });
+labBookingSchema.index({ createdAt: -1 });
 
 export const LabBooking = mongoose.model("LabBooking", labBookingSchema);

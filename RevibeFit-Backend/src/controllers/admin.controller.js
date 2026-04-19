@@ -21,6 +21,7 @@ import jwt from "jsonwebtoken";
 import config from "../config/index.js";
 import bcrypt from "bcryptjs";
 import { escapeRegex } from "../middlewares/validate.middleware.js";
+import { cacheDelete } from "../config/redis.js";
 
 /**
  * @desc    Admin Login
@@ -179,6 +180,9 @@ const approveUser = asyncHandler(async (req, res) => {
   user.approvedBy = adminEmail;
   user.approvedAt = new Date();
   await user.save();
+
+  await cacheDelete("trainers:approved:*");
+  await cacheDelete("labPartners:approved:*");
 
   // Only send email to trainers and lab partners
   // Don't let email failures prevent the approval from succeeding

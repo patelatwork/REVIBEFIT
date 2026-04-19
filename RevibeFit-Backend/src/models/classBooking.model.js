@@ -113,6 +113,7 @@ classBookingSchema.index({ userId: 1, classId: 1 }, { unique: true });
 classBookingSchema.index({ trainerId: 1, bookingDate: 1 });
 classBookingSchema.index({ userId: 1, bookingStatus: 1 });
 classBookingSchema.index({ classId: 1, bookingStatus: 1 });
+classBookingSchema.index({ createdAt: -1 });
 
 // Virtual to populate class and trainer details
 classBookingSchema.virtual('classDetails', {

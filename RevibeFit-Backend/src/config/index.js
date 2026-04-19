@@ -11,7 +11,7 @@ import { dirname, resolve } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-dotenv.config({ path: resolve(__dirname, "../../.env") });
+dotenv.config({ path: resolve(__dirname, "../../.env"), override: false });
 
 const config = {
   // Server
@@ -21,6 +21,13 @@ const config = {
 
   // Database
   mongodbUri: process.env.MONGODB_URI,
+
+  // Redis
+  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
+
+  // B2B
+  b2bApiKey: process.env.B2B_API_KEY,
+  productionUrl: process.env.PRODUCTION_URL,
 
   // JWT
   jwtSecret: process.env.JWT_SECRET,

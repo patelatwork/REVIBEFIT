@@ -7,6 +7,7 @@ import { LiveClass } from "../models/liveClass.model.js";
 import { ClassBooking } from "../models/classBooking.model.js";
 import { Blog } from "../models/blog.model.js";
 import mongoose from "mongoose";
+import { cacheGet, cacheSet } from "../config/redis.js";
 
 /**
  * @desc    Get all approved trainers
@@ -14,20 +15,31 @@ import mongoose from "mongoose";
  * @access  Public
  */
 export const getAllApprovedTrainers = asyncHandler(async (req, res) => {
-  // Find all trainers who are approved and active
+  const cacheKey = `trainers:approved:${JSON.stringify(req.query)}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) {
+    const response = new ApiResponse(200, cached, "Approved trainers retrieved successfully");
+    response.fromCache = true;
+    return res.status(200).json(response);
+  }
+
   const trainers = await User.find({
     userType: USER_TYPES.TRAINER,
     isApproved: true,
     isActive: true,
     approvalStatus: "approved",
-  }).select("-password -refreshToken -__v");
+  })
+    .select("name email specialization state bio socialLinks profilePhoto isVerified")
+    .lean();
 
-  // If no trainers found
   if (!trainers || trainers.length === 0) {
     return res.status(200).json(
       new ApiResponse(200, [], "No approved trainers found")
     );
   }
+
+  await cacheSet(cacheKey, trainers, 300);
 
   return res.status(200).json(
     new ApiResponse(200, trainers, "Approved trainers retrieved successfully")

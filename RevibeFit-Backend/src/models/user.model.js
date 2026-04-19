@@ -388,4 +388,10 @@ userSchema.methods.generateRefreshToken = function () {
   );
 };
 
+// ── Indexes ────────────────────────────────────────────────
+userSchema.index({ userType: 1, approvalStatus: 1 });
+userSchema.index({ userType: 1, isVerified: 1, isActive: 1 });
+userSchema.index({ state: 1, userType: 1 });
+userSchema.index({ createdAt: -1 });
+
 export const User = mongoose.model("User", userSchema);

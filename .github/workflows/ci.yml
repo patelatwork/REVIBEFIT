@@ -5,6 +5,16 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      demo_mode:
+        description: "Run mode for demo (normal or intentional-fail)"
+        required: true
+        default: normal
+        type: choice
+        options:
+          - normal
+          - intentional-fail
 
 # Cancel superseded runs on the same branch/PR, but never cancel main.
 concurrency:
@@ -35,10 +45,18 @@ jobs:
       # Tests mock ioredis/mongoose — no DB or Redis service needed.
       # JWT_SECRET is required by auth code paths even when mocked.
       - name: Run tests with coverage
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.demo_mode != 'intentional-fail' }}
         env:
           NODE_ENV: test
           JWT_SECRET: test-secret-for-ci
         run: npm run test:coverage
+
+      - name: Run intentional fail demo test
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.demo_mode == 'intentional-fail' }}
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test-secret-for-ci
+        run: npm run test:demo:fail
 
       - name: Upload coverage report
         if: always()

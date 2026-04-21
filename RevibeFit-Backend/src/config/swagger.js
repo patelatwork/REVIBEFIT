@@ -20,7 +20,7 @@ const swaggerDefinition = {
   servers: [
     {
       url: config.isProduction
-        ? process.env.PRODUCTION_URL || `http://localhost:${config.port}`
+        ? process.env.PRODUCTION_URL || `https://revibefit-backend.onrender.com`
         : `http://localhost:${config.port}`,
       description: config.isProduction ? "Production server" : "Development server",
     },

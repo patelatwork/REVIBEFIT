@@ -39,14 +39,14 @@ app.use(
 );
 
 // CORS: Restrict to known origins (not wildcard)
-app.use(
-  cors({
-    origin: config.corsOrigin.split(",").map((o) => o.trim()),
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+const corsOptions = {
+  origin: config.corsOrigin.split(",").map((o) => o.trim()),
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // Rate limiting: Prevent brute-force / DDoS on all API routes
 app.use("/api", apiLimiter);

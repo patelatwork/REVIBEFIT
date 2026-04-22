@@ -116,7 +116,7 @@ describe("User schema — email", () => {
 
 describe("User schema — phone", () => {
   it("phone required", async () => {
-    const data = baseEnthusiast();
+    const data = baseEnthusiast()
     delete data.phone;
     await expectValidationError(data, "phone");
   });

@@ -46,7 +46,7 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 // Rate limiting: Prevent brute-force / DDoS on all API routes
 app.use("/api", apiLimiter);

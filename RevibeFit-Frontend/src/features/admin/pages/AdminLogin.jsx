@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import logo from '../../../assets/exercise_8407005.png';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -48,7 +50,7 @@ const AdminLogin = () => {
     if (validateForm()) {
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:8000/api/admin/login', {
+        const response = await fetch(`${API_BASE}/api/admin/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

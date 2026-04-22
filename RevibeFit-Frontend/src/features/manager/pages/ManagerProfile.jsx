@@ -5,7 +5,8 @@ import { User, Mail, Phone, MapPin, Shield, Calendar, Camera, Lock, Eye, EyeOff,
 import ManagerSidebar from '../components/ManagerSidebar';
 import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
-const API = 'http://localhost:8000/api';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API = `${API_BASE}/api`;
 
 const ManagerProfile = () => {
     const navigate = useNavigate();

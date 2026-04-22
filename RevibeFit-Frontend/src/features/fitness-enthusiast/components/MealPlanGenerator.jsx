@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 const MealPlanGenerator = ({ nutritionProfile, onPlanGenerated }) => {
   const [planType, setPlanType] = useState('weekly');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
@@ -15,7 +17,7 @@ const MealPlanGenerator = ({ nutritionProfile, onPlanGenerated }) => {
     try {
       const token = localStorage.getItem('accessToken');
       const response = await axios.post(
-        'http://localhost:8000/api/nutrition/meal-plan/generate',
+        `${API_BASE}/api/nutrition/meal-plan/generate`,
         {
           planType,
           startDate,

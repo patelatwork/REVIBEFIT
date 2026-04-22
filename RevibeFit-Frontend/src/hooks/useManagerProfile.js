@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API = 'http://localhost:8000/api/manager';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API = `${API_BASE}/api/manager`;
 
 /**
  * Hook that syncs the manager's profile (especially assignedRegions) with the server

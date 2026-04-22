@@ -81,3 +81,15 @@ When admin changes a manager's assigned regions, the manager's UI automatically 
 - [x] **Frontend `ManagerEarnings.jsx`** — Same integration, earnings data re-fetches on region change
 - [x] **Frontend `ManagerCommissionRequests.jsx`** — Same integration, commission requests re-fetch on region change
 - [x] **Frontend `ManagerProfile.jsx`** — Same integration, profile data re-fetches on region change
+
+---
+
+# Production URL Hardening Sweep
+
+## Summary
+Replace remaining hardcoded `http://localhost:8000` frontend API calls with environment-based URLs to prevent connection-refused errors on deployed frontend.
+
+## Tasks
+- [x] Identify all hardcoded localhost API usages in frontend source
+- [x] Replace manager/auth/hooks/nutrition/video-room hardcoded URLs with `VITE_API_URL` + localhost fallback
+- [x] Build frontend to verify no regressions

@@ -20,6 +20,8 @@ import SavedMealPlans from '../components/SavedMealPlans';
 import MealLogger from '../components/MealLogger';
 import DailyNutritionTracker from '../components/DailyNutritionTracker';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 const NutritionPlan = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -45,7 +47,7 @@ const NutritionPlan = () => {
   const fetchNutritionProfile = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await axios.get('http://localhost:8000/api/nutrition/profile', {
+      const response = await axios.get(`${API_BASE}/api/nutrition/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setNutritionProfile(response.data.data);

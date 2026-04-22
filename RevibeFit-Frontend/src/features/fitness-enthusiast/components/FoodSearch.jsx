@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { Search, Plus, ChevronDown, ChevronUp, Loader2, UtensilsCrossed, AlertCircle } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 const FoodSearch = ({ onAddFood }) => {
   const [query, setQuery] = useState('');

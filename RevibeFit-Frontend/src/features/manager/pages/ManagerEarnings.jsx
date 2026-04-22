@@ -5,7 +5,8 @@ import { TrendingUp, DollarSign, Building2, BarChart3, Calendar, ArrowUpRight, A
 import ManagerSidebar from '../components/ManagerSidebar';
 import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
-const API = 'http://localhost:8000/api/manager';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API = `${API_BASE}/api/manager`;
 
 const ManagerEarnings = () => {
     const navigate = useNavigate();

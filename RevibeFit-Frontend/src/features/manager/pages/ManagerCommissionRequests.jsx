@@ -5,7 +5,8 @@ import { ArrowLeftRight, Plus, Send, Clock, CheckCircle, XCircle, ChevronDown, C
 import ManagerSidebar from '../components/ManagerSidebar';
 import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
-const API = 'http://localhost:8000/api/manager';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API = `${API_BASE}/api/manager`;
 
 const statusConfig = {
     pending: { bg: 'bg-amber-100', text: 'text-amber-700', icon: Clock, label: 'Pending' },

@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 
-const API = 'http://localhost:8000/api/admin';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API = `${API_BASE}/api/admin`;
 
 const REGION_NAMES = [
     "Northern India", "Southern India", "Eastern India",

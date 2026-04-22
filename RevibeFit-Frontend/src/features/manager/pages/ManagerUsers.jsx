@@ -5,7 +5,8 @@ import { Users, Search, Ban, CheckCircle, Eye } from 'lucide-react';
 import ManagerSidebar from '../components/ManagerSidebar';
 import { useManagerProfile } from '../../../hooks/useManagerProfile';
 
-const API = 'http://localhost:8000/api/manager';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API = `${API_BASE}/api/manager`;
 
 const ManagerUsers = () => {
     const navigate = useNavigate();

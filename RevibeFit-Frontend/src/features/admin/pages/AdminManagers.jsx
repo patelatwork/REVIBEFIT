@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { UserCog, Plus, Trash2, Activity, X, Users, MapPin } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 
-const API = 'http://localhost:8000/api/admin';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API = `${API_BASE}/api/admin`;
 
 const INDIAN_REGIONS = {
     "Northern India": ["Jammu & Kashmir", "Himachal Pradesh", "Punjab", "Uttarakhand", "Haryana", "Delhi", "Chandigarh", "Ladakh", "Rajasthan", "Uttar Pradesh"],

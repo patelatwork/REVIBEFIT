@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWebRTC } from '../../../hooks/useWebRTC';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 /* ───── Reusable video tile (memoised to prevent flicker) ───── */
 const VideoTile = memo(({ stream, name, isTrainer: isTrn }) => {
   // Callback ref: only sets srcObject when the DOM node changes or stream changes
@@ -79,7 +81,7 @@ const TrainerVideoRoom = () => {
       try {
         const token = localStorage.getItem('accessToken');
         const res = await fetch(
-          `http://localhost:8000/api/classes/${classId}/room-info`,
+          `${API_BASE}/api/classes/${classId}/room-info`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = await res.json();

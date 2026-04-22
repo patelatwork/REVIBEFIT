@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Calendar, Clock, Utensils, Trash2, Eye, Star } from 'lucide-react';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 const SavedMealPlans = ({ onSelectPlan }) => {
   const [mealPlans, setMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ const SavedMealPlans = ({ onSelectPlan }) => {
   const fetchMealPlans = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await axios.get('http://localhost:8000/api/nutrition/meal-plans', {
+      const response = await axios.get(`${API_BASE}/api/nutrition/meal-plans`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMealPlans(response.data.data);
@@ -33,7 +35,7 @@ const SavedMealPlans = ({ onSelectPlan }) => {
     setDeletingId(planId);
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.delete(`http://localhost:8000/api/nutrition/meal-plans/${planId}`, {
+      await axios.delete(`${API_BASE}/api/nutrition/meal-plans/${planId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMealPlans(mealPlans.filter(plan => plan._id !== planId));

@@ -12,6 +12,8 @@ import {
   selectTotalWorkoutsCompleted,
 } from '../store/slices/workoutSlice';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 /**
  * Custom hook for Redux workout management
  * Provides easy access to workout state and actions
@@ -28,7 +30,7 @@ export const useReduxWorkout = () => {
   // Load completed workouts
   const loadCompletedWorkouts = useCallback(async (token) => {
     try {
-      const response = await fetch('http://localhost:8000/api/workouts/completed', {
+      const response = await fetch(`${API_BASE}/api/workouts/completed`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();

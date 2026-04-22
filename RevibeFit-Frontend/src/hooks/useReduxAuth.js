@@ -14,6 +14,8 @@ import {
   selectAuthError,
 } from '../store/slices/authSlice';
 
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
 /**
  * Custom hook for Redux authentication
  * Provides easy access to auth state and actions
@@ -33,7 +35,7 @@ export const useReduxAuth = () => {
   const login = useCallback(async (credentials) => {
     dispatch(loginStart());
     try {
-      const response = await fetch('http://localhost:8000/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

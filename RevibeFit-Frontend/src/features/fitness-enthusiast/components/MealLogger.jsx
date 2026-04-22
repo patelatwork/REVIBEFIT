@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Trash2, Plus, Save, Loader2, Coffee, Sun, Moon, Cookie, UtensilsCrossed, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import FoodSearch from './FoodSearch';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 const MEAL_TYPES = [
   { id: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'amber' },

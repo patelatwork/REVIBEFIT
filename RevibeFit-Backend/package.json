@@ -11,6 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "test:demo:pass": "vitest run src/__tests__/auth.test.js",
     "test:demo:fail": "DEMO_FORCE_FAIL=1 vitest run src/__tests__/auth.demo.fail.test.js",
+    "test:real:failures": "vitest run src/__tests__/auth.real.failures.test.js",
     "benchmark:redis": "node scripts/redis-benchmark.js",
     "fix-invoice-index": "node scripts/drop-invoice-unique-index.js",
     "create-test-booking": "node scripts/create-test-booking.js"
